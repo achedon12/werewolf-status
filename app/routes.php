@@ -35,12 +35,11 @@ return function (App $app) {
             $results[$endpoint['name']] = $downtimeService->handleCheck($endpoint, $result);
         }
 
+        $infos = $checker->check('https://loupsgarous.net/api/infos');
+
         return [
             'results' => $results,
-            'infos' => [
-                'json' => null,
-                'error' => null,
-            ],
+            'infos' => $infos,
         ];
     };
 

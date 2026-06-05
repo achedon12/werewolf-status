@@ -32,7 +32,7 @@ $status = getGlobalStatusData($results);
 
             <?php if (isset($infos['json']) && is_array($infos['json'])): ?>
                 <div class="text-sm text-slate-400">
-                    Version: <?= e($infos['json']['version'] ?? $infos['json']['ver'] ?? '') ?>
+                    v<?= e($infos['json']['version'] ?? $infos['json']['ver'] ?? '') ?>
                     <?php if (!empty($infos['json']['author'] ?? '')): ?>
                         — <?= e($infos['json']['author']) ?>
                     <?php endif; ?>
