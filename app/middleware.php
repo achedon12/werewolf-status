@@ -7,4 +7,7 @@ use Slim\App;
 
 return function (App $app) {
     $app->add(SessionMiddleware::class);
+
+    $app->addBodyParsingMiddleware();
+    $app->addRoutingMiddleware();
 };

@@ -13,7 +13,7 @@ use App\Infrastructure\Persistence\Status\PdoEndpointRepository;
 use App\Infrastructure\Persistence\Status\PdoSettingsRepository;
 use Psr\Http\Message\ResponseInterface as Response;
 
-final class GetStatusAction extends Action
+final class ViewStatusPageAction extends Action
 {
     protected function action(): Response
     {
@@ -44,8 +44,21 @@ final class GetStatusAction extends Action
             );
         }
 
-        return $this->respondWithData([
-            'results' => $results,
-        ]);
+        $infos = $checker->check('https://loupsgarous.net/api/infos');
+
+        $viewFile = __DIR__ . '/../../../../app/views/status.php';
+
+        if (!file_exists($viewFile)) {
+            $this->response->getBody()->write('Vue status introuvable : ' . $viewFile);
+            return $this->response->withStatus(500);
+        }
+
+        ob_start();
+        require $viewFile;
+        $html = ob_get_clean();
+
+        $this->response->getBody()->write($html);
+
+        return $this->response;
     }
 }

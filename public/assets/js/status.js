@@ -151,7 +151,12 @@ async function refreshStatus() {
             throw new Error('API error');
         }
 
-        const data = await response.json();
+        const payload = await response.json();
+        const data = payload.data ?? payload;
+
+        if (!data.results) {
+            throw new Error('Invalid API response: missing results');
+        }
 
         renderServices(data.results);
         updateGlobalStatus(data.results);
@@ -174,6 +179,16 @@ function renderServices(results) {
     container.innerHTML = Object.entries(results).map(([name, service]) => renderServiceCard(name, service)).join('');
 }
 
+function getPeriodLabel(service) {
+    const periodHours = Number(service.history?.period_hours ?? 48);
+
+    if (periodHours <= 72){
+        return `${periodHours}h ago`;
+    }else{
+        return `${Math.floor(periodHours/24)}j ago`;
+    }
+}
+
 function renderServiceCard(name, service) {
     const online = isServiceOnline(service);
     const percent = service.history ? service.history.uptime_percent : 0;
@@ -182,8 +197,8 @@ function renderServiceCard(name, service) {
     const uptimeClass = online ? 'text-slate-400' : 'text-red-300';
 
     return `
-        <article class="${getServiceCardClass(online)} rounded-xl p-4 mb-4 flex items-center justify-between">
-          <div class="flex items-center">
+        <article class="${getServiceCardClass(online)} rounded-xl p-4 mb-4 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div class="flex items-start gap-4">
             ${badge}
 
             <div>
@@ -192,21 +207,23 @@ function renderServiceCard(name, service) {
             </div>
           </div>
 
-          <div class="flex items-center gap-4">
-            <div class="text-sm text-slate-400">48h ago</div>
-            <div class="relative flex gap-1 items-center h-10">${renderSlots(service, online)}</div>
-            <div class="text-sm text-slate-400">now</div>
+          <div class="w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
+              <div class="min-w-max flex items-center gap-4">
+                <div class="text-sm text-slate-400">${getPeriodLabel(service)}</div>
+                <div class="relative flex gap-1 items-center h-10">${renderSlots(service, online)}</div>
+                <div class="text-sm text-slate-400">now</div>
+              </div>
           </div>
         </article>
       `;
 }
 
 function renderPercentBadge(percent) {
-    return `<span class="inline-block ${getPercentColorClass(percent)} font-bold px-3 py-1 rounded-full mr-4">${escapeHtml(percent)}%</span>`;
+    return `<span class="inline-block ${getPercentColorClass(percent)} font-bold px-3 py-1 rounded-full shrink-0">${escapeHtml(percent)}%</span>`;
 }
 
 function renderOfflineBadge() {
-    return '<span class="inline-block bg-red-500 text-white font-bold px-3 py-1 rounded-full mr-4">Offline</span>';
+    return '<span class="inline-block bg-red-500 text-white font-bold px-3 py-1 rounded-full shrink-0">Offline</span>';
 }
 
 function renderServiceName(name, service,online) {
@@ -220,7 +237,7 @@ function renderServiceName(name, service,online) {
     }
 
     return `
-        <div class="text-lg flex items-center gap-2">
+        <div class="text-lg flex items-center gap-2 break-words">
           <a href="${escapeHtml(publicUrl)}" target="_blank" rel="noopener noreferrer" class="hover:${hoverTextColor} transition ${textColor}">
             ${escapeHtml(name)}
           </a>

@@ -2,7 +2,22 @@
 
 declare(strict_types=1);
 
+use App\Application\Actions\Admin\CreateAdminUserAction;
+use App\Application\Actions\Admin\CreateEndpointAction;
+use App\Application\Actions\Admin\DeleteAdminUserAction;
+use App\Application\Actions\Admin\DeleteEndpointAction;
+use App\Application\Actions\Admin\LoginAdminAction;
+use App\Application\Actions\Admin\LogoutAdminAction;
+use App\Application\Actions\Admin\ToggleAdminUserAction;
+use App\Application\Actions\Admin\ToggleEndpointAction;
+use App\Application\Actions\Admin\UpdateAdminPasswordAction;
+use App\Application\Actions\Admin\UpdateEndpointAction;
+use App\Application\Actions\Admin\UpdateSettingsAction;
+use App\Application\Actions\Admin\ViewAdminAction;
+use App\Application\Actions\Admin\ViewAdminLoginAction;
 use App\Application\Actions\Status\GetStatusAction;
+use App\Application\Actions\Status\ViewStatusPageAction;
+use App\Application\Middleware\AdminAuthMiddleware;
 use App\Application\Service\DowntimeService;
 use App\Application\Service\StatusChecker;
 use App\Infrastructure\Persistence\Database\ConnectionFactory;
@@ -14,63 +29,38 @@ use Slim\App;
 
 return function (App $app) {
 
-    $buildStatusPayload = function (): array {
-        $pdo = ConnectionFactory::create();
-
-        $endpointRepository = new PdoEndpointRepository($pdo);
-        $downtimeRepository = new PdoDowntimeRepository($pdo);
-
-        $checker = new StatusChecker();
-        $downtimeService = new DowntimeService($downtimeRepository);
-
-        $results = [];
-
-        foreach ($endpointRepository->findEnabled() as $endpoint) {
-            $result = $checker->check($endpoint->getCheckUrl());
-
-            $result['id'] = $endpoint->getId();
-            $result['public_url'] = $endpoint->getPublicUrl();
-            $result['check_url'] = $endpoint->getCheckUrl();
-            $result['uptime_unit'] = $endpoint->getUptimeUnit();
-
-            $results[$endpoint->getName()] = $downtimeService->handleCheck($endpoint, $result);
-        }
-
-        $infos = $checker->check('https://loupsgarous.net/api/infos');
-
-        return [
-            'results' => $results,
-            'infos' => $infos,
-        ];
-    };
-
-
-    $app->get('/', function (Request $request, Response $response) use ($buildStatusPayload): Response {
-        $payload = $buildStatusPayload();
-
-        $results = $payload['results'];
-        $infos = $payload['infos'];
-
-        $viewFile = __DIR__ . '/views/status.php';
-
-        if (!file_exists($viewFile)) {
-            $response->getBody()->write(
-                '<pre>View not found: ' . htmlspecialchars($viewFile, ENT_QUOTES | ENT_SUBSTITUTE) . '</pre>'
-            );
-
-            return $response;
-        }
-
-        ob_start();
-        require $viewFile;
-        $html = ob_get_clean();
-
-        $response->getBody()->write($html);
-
+    $app->options('/{routes:.*}', function (Request $request, Response $response): Response {
         return $response;
     });
 
-    $app->get('/api/status',  GetStatusAction::class);
+    /*
+    * Public status page
+    */
+    $app->get('/', ViewStatusPageAction::class);
 
+    /*
+     * Public API
+     */
+    $app->get('/api/status', GetStatusAction::class);
+
+    $app->get('/admin/login', ViewAdminLoginAction::class);
+    $app->post('/admin/login', LoginAdminAction::class);
+    $app->post('/admin/logout', LogoutAdminAction::class);
+
+    $app->group('/admin', function ($group): void {
+        $group->get('', ViewAdminAction::class);
+
+        $group->post('/settings', UpdateSettingsAction::class);
+
+        $group->post('/endpoints', CreateEndpointAction::class);
+        $group->post('/endpoints/{id}/update', UpdateEndpointAction::class);
+        $group->post('/endpoints/{id}/delete', DeleteEndpointAction::class);
+        $group->post('/endpoints/{id}/toggle', ToggleEndpointAction::class);
+
+        $group->post('/admins', CreateAdminUserAction::class);
+        $group->post('/admins/{id:[0-9]+}/password', UpdateAdminPasswordAction::class);
+        $group->post('/admins/{id:[0-9]+}/toggle', ToggleAdminUserAction::class);
+        $group->post('/admins/{id:[0-9]+}/delete', DeleteAdminUserAction::class);
+    })->add(AdminAuthMiddleware::class);
 
 };
