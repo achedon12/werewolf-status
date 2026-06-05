@@ -21,7 +21,7 @@ $status = getGlobalStatusData($results);
 </head>
 
 <body class="bg-slate-900 text-slate-100 min-h-screen">
-<div class="max-w-6xl mx-auto p-6">
+<div class="max-w-6xl mx-auto px-4 py-6 sm:p-6">
     <header class="flex items-center gap-4 mb-6">
         <div class="w-16 h-16 rounded-xl overflow-hidden bg-slate-800 flex items-center justify-center">
             <img src="/logo.png" alt="logo" class="w-full h-full object-cover" onerror="this.style.display='none'">
@@ -65,7 +65,7 @@ $status = getGlobalStatusData($results);
     </footer>
 </div>
 
-<footer>
+<footer class="mb-10">
     <p class="text-center text-slate-500">
         &copy; <?= date("Y") ?> Loup-Garou Online. Tous droits réservés.
     </p>

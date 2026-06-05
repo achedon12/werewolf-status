@@ -85,16 +85,18 @@ final class PdoDowntimeRepository implements DowntimeRepository
         int $slotCount = 24
     ): array {
         $now = time();
-        $periodStart = $now - ($periodHours * 3600);
-        $slotDuration = (int) (($periodHours * 3600) / $slotCount);
+
+        $periodSeconds = $periodHours * 3600;
+        $periodStart = $now - $periodSeconds;
+        $slotDuration = (int) ($periodSeconds / $slotCount);
 
         $stmt = $this->pdo->prepare(
             'SELECT *
-             FROM downtimes
-             WHERE endpoint_id = :endpoint_id
-             AND down_at < :period_end
-             AND (up_at IS NULL OR up_at > :period_start)
-             ORDER BY down_at ASC'
+         FROM downtimes
+         WHERE endpoint_id = :endpoint_id
+         AND down_at < :period_end
+         AND (up_at IS NULL OR up_at > :period_start)
+         ORDER BY down_at ASC'
         );
 
         $stmt->execute([
@@ -132,7 +134,11 @@ final class PdoDowntimeRepository implements DowntimeRepository
                     $downtimeSecondsInSlot += $overlapEnd - $overlapStart;
                 }
 
-                if ($event['up_at'] === null && $downAt >= $slotStart && $downAt < $slotEnd) {
+                if (
+                    $event['up_at'] === null
+                    && $downAt >= $slotStart
+                    && $downAt < $slotEnd
+                ) {
                     $startedAgo = $this->formatAgo($downAt, $now);
                 }
             }
@@ -153,14 +159,13 @@ final class PdoDowntimeRepository implements DowntimeRepository
                 'uptime_seconds' => $slotDuration - $downtimeSecondsInSlot,
                 'from' => date('Y-m-d H:i:s', $slotStart),
                 'to' => date('Y-m-d H:i:s', $slotEnd),
-                'label' => date('H:i', $slotStart) . ' - ' . date('H:i', $slotEnd),
+                'label' => $this->formatSlotLabel($slotStart, $slotEnd, $now),
                 'started_ago' => $startedAgo,
             ];
         }
 
-        $totalPeriodSeconds = $periodHours * 3600;
         $uptimePercent = round(
-            (($totalPeriodSeconds - $totalDowntimeSeconds) / $totalPeriodSeconds) * 100,
+            (($periodSeconds - $totalDowntimeSeconds) / $periodSeconds) * 100,
             2
         );
 
@@ -205,5 +210,32 @@ final class PdoDowntimeRepository implements DowntimeRepository
         }
 
         return intdiv($hours, 24) . 'd ago';
+    }
+
+    private function formatSlotLabel(int $slotStart, int $slotEnd, int $now): string
+    {
+        $startDayOffset = (int) floor(($slotStart - $now) / 86400);
+        $endDayOffset = (int) floor(($slotEnd - $now) / 86400);
+
+        $startTime = date('H:i', $slotStart);
+        $endTime = date('H:i', $slotEnd);
+
+        $startLabel = $this->formatDayOffset($startDayOffset) . ' ' . $startTime;
+        $endLabel = $this->formatDayOffset($endDayOffset) . ' ' . $endTime;
+
+        return $startLabel . ' → ' . $endLabel;
+    }
+
+    private function formatDayOffset(int $dayOffset): string
+    {
+        if ($dayOffset === 0) {
+            return 'Aujourd’hui';
+        }
+
+        if ($dayOffset === -1) {
+            return 'Hier';
+        }
+
+        return 'J' . $dayOffset;
     }
 }

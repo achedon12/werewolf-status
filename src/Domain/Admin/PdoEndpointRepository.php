@@ -1,17 +1,9 @@
 <?php
 
-declare(strict_types=1);
+namespace App\Domain\Admin;
 
-namespace App\Domain\Status;
-
-interface EndpointRepository
+interface PdoEndpointRepository
 {
-    public function findAll(): array;
-
-    public function findEnabled(): array;
-
-    public function findById(int $id): ?Endpoint;
-
     public function create(
         string $name,
         string $checkUrl,
@@ -31,5 +23,5 @@ interface EndpointRepository
 
     public function delete(int $id): void;
 
-    public function toggle(int $id): void;
+
 }

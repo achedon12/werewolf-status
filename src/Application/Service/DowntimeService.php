@@ -13,7 +13,7 @@ final class DowntimeService
         private DowntimeRepository $repository
     ) {}
 
-    public function handleCheck(Endpoint $endpoint, array $result): array
+    public function handleCheck(Endpoint $endpoint, array $result, int $periodHours = 48): array
     {
         $endpointId = $endpoint->getId();
         $httpCode = $result['http_code'] ?? null;
@@ -30,7 +30,11 @@ final class DowntimeService
             $this->repository->endDowntime($endpointId);
         }
 
-        $result['history'] = $this->repository->getStats($endpointId, 48, 24);
+        $result['history'] = $this->repository->getStats(
+            $endpointId,
+            $periodHours,
+            24
+        );
 
         return $result;
     }

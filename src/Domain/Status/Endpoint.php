@@ -12,7 +12,8 @@ final class Endpoint
         private string $checkUrl,
         private ?string $publicUrl,
         private string $uptimeUnit,
-        private bool $isEnabled
+        private bool $isEnabled,
+        private bool $discordNotificationsEnabled
     ) {}
 
     public function getId(): int
@@ -45,27 +46,21 @@ final class Endpoint
         return $this->isEnabled;
     }
 
+    public function isDiscordNotificationsEnabled(): bool
+    {
+        return $this->discordNotificationsEnabled;
+    }
+
     public static function fromArray(array $data): self
     {
         return new self(
             (int) $data['id'],
             (string) $data['name'],
             (string) $data['check_url'],
-            $data['public_url'] ?? null,
+            $data['public_url'] !== null ? (string) $data['public_url'] : null,
             (string) ($data['uptime_unit'] ?? 'seconds'),
-            (bool) $data['is_enabled']
+            (bool) $data['is_enabled'],
+            (bool) ($data['discord_notifications_enabled'] ?? true)
         );
-    }
-
-    public function toArray(): array
-    {
-        return [
-            'id' => $this->id,
-            'name' => $this->name,
-            'check_url' => $this->checkUrl,
-            'public_url' => $this->publicUrl,
-            'uptime_unit' => $this->uptimeUnit,
-            'is_enabled' => $this->isEnabled,
-        ];
     }
 }

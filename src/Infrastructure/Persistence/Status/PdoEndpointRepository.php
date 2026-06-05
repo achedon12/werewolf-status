@@ -12,7 +12,9 @@ final class PdoEndpointRepository implements EndpointRepository
 {
     public function __construct(
         private PDO $pdo
-    ) {}
+    )
+    {
+    }
 
     public function findEnabled(): array
     {
@@ -24,7 +26,7 @@ final class PdoEndpointRepository implements EndpointRepository
         );
 
         return array_map(
-            fn (array $row): Endpoint => Endpoint::fromArray($row),
+            fn(array $row): Endpoint => Endpoint::fromArray($row),
             $stmt->fetchAll()
         );
     }
@@ -48,11 +50,8 @@ final class PdoEndpointRepository implements EndpointRepository
     }
 
     public function create(
-        string $name,
-        string $checkUrl,
-        ?string $publicUrl,
-        string $uptimeUnit
-    ): int {
+        string $name, string $checkUrl, ?string $publicUrl, string $uptimeUnit, bool $discordNotificationsEnabled): int
+    {
         $stmt = $this->pdo->prepare(
             'INSERT INTO endpoints (
                 name,
@@ -80,6 +79,87 @@ final class PdoEndpointRepository implements EndpointRepository
             'uptime_unit' => $uptimeUnit,
         ]);
 
-        return (int) $this->pdo->lastInsertId();
+        return (int)$this->pdo->lastInsertId();
+    }
+
+    public function findAll(): array
+    {
+        $stmt = $this->pdo->query(
+            'SELECT *
+                 FROM endpoints
+                 ORDER BY id ASC'
+        );
+
+        $rows = $stmt->fetchAll();
+
+        return array_map(
+            fn(array $row) => \App\Domain\Status\Endpoint::fromArray($row),
+            $rows
+        );
+    }
+
+    public function update(
+        int     $id,
+        string  $name,
+        string  $checkUrl,
+        ?string $publicUrl,
+        string  $uptimeUnit,
+        bool    $discordNotificationsEnabled
+    ): void
+    {
+        $stmt = $this->pdo->prepare(
+            'UPDATE endpoints
+         SET name = :name,
+             check_url = :check_url,
+             public_url = :public_url,
+             uptime_unit = :uptime_unit,
+             discord_notifications_enabled = :discord_notifications_enabled,
+             updated_at = NOW()
+         WHERE id = :id'
+        );
+
+        $stmt->execute([
+            'id' => $id,
+            'name' => $name,
+            'check_url' => $checkUrl,
+            'public_url' => $publicUrl,
+            'uptime_unit' => $uptimeUnit,
+            'discord_notifications_enabled' => $discordNotificationsEnabled ? 1 : 0,
+        ]);
+    }
+
+    public function delete(int $id): void
+    {
+        $stmt = $this->pdo->prepare(
+            'DELETE FROM endpoints
+         WHERE id = :id'
+        );
+
+        $stmt->execute([
+            'id' => $id,
+        ]);
+    }
+
+    public function toggle(int $id): void
+    {
+        $endpoint = $this->findById($id);
+
+        if ($endpoint === null) {
+            return;
+        }
+
+        $isEnabled = $endpoint->isEnabled() ? 0 : 1;
+
+        $stmt = $this->pdo->prepare(
+            'UPDATE endpoints
+         SET is_enabled = :is_enabled,
+             updated_at = NOW()
+         WHERE id = :id'
+        );
+
+        $stmt->execute([
+            'id' => $id,
+            'is_enabled' => $isEnabled,
+        ]);
     }
 }
