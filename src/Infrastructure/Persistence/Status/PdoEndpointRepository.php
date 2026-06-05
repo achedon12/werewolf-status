@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Persistence\Status;
 
+use App\Domain\Status\Endpoint;
 use App\Domain\Status\EndpointRepository;
 use PDO;
 
@@ -22,10 +23,13 @@ final class PdoEndpointRepository implements EndpointRepository
              ORDER BY id ASC'
         );
 
-        return $stmt->fetchAll();
+        return array_map(
+            fn (array $row): Endpoint => Endpoint::fromArray($row),
+            $stmt->fetchAll()
+        );
     }
 
-    public function findById(int $id): ?array
+    public function findById(int $id): ?Endpoint
     {
         $stmt = $this->pdo->prepare(
             'SELECT *
@@ -40,7 +44,7 @@ final class PdoEndpointRepository implements EndpointRepository
 
         $endpoint = $stmt->fetch();
 
-        return $endpoint ?: null;
+        return $endpoint ? Endpoint::fromArray($endpoint) : null;
     }
 
     public function create(

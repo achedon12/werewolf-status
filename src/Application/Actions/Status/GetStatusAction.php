@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace App\Application\Actions\Status;
 
+use App\Application\Actions\Action;
 use App\Application\Service\DowntimeService;
 use App\Application\Service\StatusChecker;
 use App\Infrastructure\Persistence\Database\ConnectionFactory;
 use App\Infrastructure\Persistence\Status\PdoDowntimeRepository;
 use App\Infrastructure\Persistence\Status\PdoEndpointRepository;
 use Psr\Http\Message\ResponseInterface as Response;
-use Psr\Http\Message\ServerRequestInterface as Request;
 
-final class GetStatusAction
+final class GetStatusAction extends Action
 {
-    public function __invoke(Request $request, Response $response): Response
+    protected function action(): Response
     {
         $pdo = ConnectionFactory::create();
 
@@ -27,22 +27,18 @@ final class GetStatusAction
         $results = [];
 
         foreach ($endpointRepository->findEnabled() as $endpoint) {
-            $result = $checker->check($endpoint['check_url']);
+            $result = $checker->check($endpoint->getCheckUrl());
 
-            $result['id'] = (int) $endpoint['id'];
-            $result['public_url'] = $endpoint['public_url'];
-            $result['check_url'] = $endpoint['check_url'];
-            $result['uptime_unit'] = $endpoint['uptime_unit'];
+            $result['id'] = (int) $endpoint->getId();
+            $result['public_url'] = $endpoint->getPublicUrl();
+            $result['check_url'] = $endpoint->getCheckUrl();
+            $result['uptime_unit'] = $endpoint->getUptimeUnit() ?? 'seconds';
 
-            $results[$endpoint['name']] = $downtimeService->handleCheck($result, $result);
+            $results[$endpoint->getName()] = $downtimeService->handleCheck($endpoint, $result);
         }
 
-        $payload = [
+        return $this->respondWithData([
             'results' => $results,
-        ];
-
-        $response->getBody()->write(json_encode($payload, JSON_UNESCAPED_UNICODE));
-
-        return $response->withHeader('Content-Type', 'application/json');
+        ]);
     }
 }

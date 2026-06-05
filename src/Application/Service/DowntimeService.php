@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Application\Service;
 
 use App\Domain\Status\DowntimeRepository;
+use App\Domain\Status\Endpoint;
 
 final class DowntimeService
 {
@@ -12,9 +13,9 @@ final class DowntimeService
         private DowntimeRepository $repository
     ) {}
 
-    public function handleCheck(array $endpoint, array $result): array
+    public function handleCheck(Endpoint $endpoint, array $result): array
     {
-        $endpointId = (int) $endpoint['id'];
+        $endpointId = $endpoint->getId();
         $httpCode = $result['http_code'] ?? null;
 
         $isDown = $this->isResultDown($result);

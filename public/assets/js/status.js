@@ -21,19 +21,40 @@ function getUptimeValue(service) {
     return null;
 }
 
-function uptimeToStartedTimestamp(uptime) {
-    if (!uptime) {
+function getUptimeUnit(service) {
+    return service.uptime_unit || 'seconds';
+}
+
+function uptimeToStartedTimestamp(uptime, unit = 'seconds') {
+    if (uptime === null || uptime === undefined || uptime === '') {
         return null;
     }
 
     if (!isNaN(uptime)) {
-        const value = parseFloat(uptime);
+        let value = parseFloat(uptime);
 
-        if (value >= 1000000000) {
-            return Math.floor(value * 1000);
+        if (value <= 0) {
+            return null;
         }
 
-        return value > 0 ? Date.now() - (value * 1000) : null;
+        if (unit === 'milliseconds') {
+            value = value / 1000;
+            return Date.now() - (value * 1000);
+        }
+
+        if (unit === 'seconds') {
+            return Date.now() - (value * 1000);
+        }
+
+        if (unit === 'timestamp_seconds') {
+            return value * 1000;
+        }
+
+        if (unit === 'timestamp_milliseconds') {
+            return value;
+        }
+
+        return Date.now() - (value * 1000);
     }
 
     const parsedDate = new Date(uptime).getTime();
@@ -45,7 +66,10 @@ function uptimeToStartedTimestamp(uptime) {
     const timeParts = String(uptime).match(/^(\d+):(\d{2})(?::(\d{2}))?$/);
 
     if (timeParts) {
-        const seconds = (Number(timeParts[1]) * 3600) + (Number(timeParts[2]) * 60) + Number(timeParts[3] || 0);
+        const seconds = (Number(timeParts[1]) * 3600)
+            + (Number(timeParts[2]) * 60)
+            + Number(timeParts[3] || 0);
+
         return Date.now() - (seconds * 1000);
     }
 
@@ -73,7 +97,10 @@ function isServiceOnline(service) {
     return service.http_code >= 200
         && service.http_code < 300
         && Boolean(service.json)
-        && uptimeToStartedTimestamp(getUptimeValue(service)) !== null;
+        && uptimeToStartedTimestamp(
+            getUptimeValue(service),
+            getUptimeUnit(service)
+        ) !== null;
 }
 
 function getGlobalStatusData(results) {
@@ -267,7 +294,10 @@ function getSlotStatusText(status) {
 }
 
 function getUptimeDisplay(service) {
-    const startedAt = uptimeToStartedTimestamp(getUptimeValue(service));
+    const startedAt = uptimeToStartedTimestamp(
+        getUptimeValue(service),
+        getUptimeUnit(service)
+    );
 
     if (!startedAt) {
         return 'Uptime: —';

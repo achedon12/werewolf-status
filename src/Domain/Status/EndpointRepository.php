@@ -8,7 +8,7 @@ interface EndpointRepository
 {
     public function findEnabled(): array;
 
-    public function findById(int $id): ?array;
+    public function findById(int $id): ?Endpoint;
 
     public function create(
         string $name,

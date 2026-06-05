@@ -7,16 +7,22 @@ namespace App\Domain\Status;
 final class Downtime
 {
     public function __construct(
-        private string $service,
+        private int $id,
+        private int $endpointId,
         private string $downAt,
         private ?string $upAt,
         private ?int $httpCode,
         private ?string $reason
     ) {}
 
-    public function getService(): string
+    public function getId(): int
     {
-        return $this->service;
+        return $this->id;
+    }
+
+    public function getEndpointId(): int
+    {
+        return $this->endpointId;
     }
 
     public function getDownAt(): string
@@ -29,6 +35,11 @@ final class Downtime
         return $this->upAt;
     }
 
+    public function isOpen(): bool
+    {
+        return $this->upAt === null;
+    }
+
     public function getHttpCode(): ?int
     {
         return $this->httpCode;
@@ -39,27 +50,12 @@ final class Downtime
         return $this->reason;
     }
 
-    public function isOpen(): bool
-    {
-        return $this->upAt === null;
-    }
-
-    public function toArray(): array
-    {
-        return [
-            'service' => $this->service,
-            'down_at' => $this->downAt,
-            'up_at' => $this->upAt,
-            'http_code' => $this->httpCode,
-            'reason' => $this->reason,
-        ];
-    }
-
     public static function fromArray(array $data): self
     {
         return new self(
-            (string) ($data['service'] ?? ''),
-            (string) ($data['down_at'] ?? ''),
+            (int) $data['id'],
+            (int) $data['endpoint_id'],
+            (string) $data['down_at'],
             $data['up_at'] ?? null,
             isset($data['http_code']) ? (int) $data['http_code'] : null,
             $data['reason'] ?? null

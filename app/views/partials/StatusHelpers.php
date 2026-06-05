@@ -11,14 +11,14 @@ function e(string|int|float|null $value): string
     return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 }
 
-function getUptimeValue(array $service): mixed
+function getUptimeValue(array $service): ?int
 {
     if (isset($service['json']['uptime'])) {
-        return $service['json']['uptime'];
+        return (int)$service['json']['uptime'];
     }
 
     if (isset($service['body']) && preg_match('/uptime\s*[:=]\s*(.+)/i', (string) $service['body'], $matches)) {
-        return trim($matches[1]);
+        return (int)trim($matches[1]);
     }
 
     return null;
@@ -29,26 +29,24 @@ function getUptimeUnit(array $service): string
     return (string) ($service['uptime_unit'] ?? 'seconds');
 }
 
-function uptimeToStartedTimestamp(mixed $uptime, string $unit = 'seconds'): ?int
+function uptimeToStartedTimestamp(?int $uptime, string $unit = 'seconds'): ?int
 {
-    if ($uptime === null || $uptime === '') {
+    if ($uptime === null) {
         return null;
     }
 
-    if (is_numeric($uptime)) {
-        $value = (float) $uptime;
+    $value = (float) $uptime;
 
-        if ($value <= 0) {
-            return null;
-        }
-
-        return match ($unit) {
-            'milliseconds' => time() - (int) floor($value / 1000),
-            'timestamp_seconds' => (int) $value,
-            'timestamp_milliseconds' => (int) floor($value / 1000),
-            default => time() - (int) $value,
-        };
+    if ($value <= 0) {
+        return null;
     }
+
+    return match ($unit) {
+        'milliseconds' => time() - (int) floor($value / 1000),
+        'timestamp_seconds' => (int) $value,
+        'timestamp_milliseconds' => (int) floor($value / 1000),
+        default => time() - (int) $value,
+    };
 
     $text = (string) $uptime;
     $timestamp = strtotime($text);

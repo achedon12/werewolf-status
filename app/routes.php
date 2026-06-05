@@ -26,13 +26,14 @@ return function (App $app) {
         $results = [];
 
         foreach ($endpointRepository->findEnabled() as $endpoint) {
-            $result = $checker->check($endpoint['check_url']);
+            $result = $checker->check($endpoint->getCheckUrl());
 
-            $result['id'] = (int) $endpoint['id'];
-            $result['public_url'] = $endpoint['public_url'];
-            $result['check_url'] = $endpoint['check_url'];
-            $result['uptime_unit'] = $endpoint['uptime_unit'] ?? 'seconds';
-            $results[$endpoint['name']] = $downtimeService->handleCheck($endpoint, $result);
+            $result['id'] = $endpoint->getId();
+            $result['public_url'] = $endpoint->getPublicUrl();
+            $result['check_url'] = $endpoint->getCheckUrl();
+            $result['uptime_unit'] = $endpoint->getUptimeUnit();
+
+            $results[$endpoint->getName()] = $downtimeService->handleCheck($endpoint, $result);
         }
 
         $infos = $checker->check('https://loupsgarous.net/api/infos');
