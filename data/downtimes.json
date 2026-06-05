@@ -1,37 +1,4 @@
 {
     "services": {
-        "Status Loups Garous": {
-            "current_status": "down",
-            "current_down_started_at": "2026-06-05T15:09:48+02:00",
-            "events": [
-                {
-                    "service": "Status Loups Garous",
-                    "down_at": "2026-06-05T15:09:48+02:00",
-                    "up_at": null,
-                    "http_code": 200,
-                    "reason": "HTTP 502"
-                }
-            ]
-        },
-        "Jeu Loups Garous": {
-            "current_status": "up",
-            "current_down_started_at": null,
-            "events": [
-                {
-                    "service": "Jeu Loups Garous",
-                    "down_at": "2026-06-05T15:00:37+02:00",
-                    "up_at": "2026-06-05T15:01:38+02:00",
-                    "http_code": 502,
-                    "reason": "HTTP 502"
-                },
-                {
-                    "service": "Jeu Loups Garous",
-                    "down_at": "2026-06-05T15:52:57+02:00",
-                    "up_at": "2026-06-05T15:54:07+02:00",
-                    "http_code": 200,
-                    "reason": "HTTP 502"
-                }
-            ]
-        }
     }
 }
