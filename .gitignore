@@ -3,5 +3,7 @@
 /coverage/
 /vendor/
 /logs/*
+/data/*
 !/logs/README.md
 .phpunit.result.cache
+.env
