@@ -23,30 +23,30 @@ final class StatusChecker
 
         $ch = curl_init();
 
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 5);
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
-        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
-
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            'Accept: application/json',
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 5,
+            CURLOPT_CONNECTTIMEOUT => 3,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYHOST => 0,
+            CURLOPT_HTTPHEADER => [
+                'Accept: application/json',
+            ],
         ]);
 
         $body = curl_exec($ch);
-        $errNo = curl_errno($ch);
-        $errMsg = curl_error($ch);
+        $errorNumber = curl_errno($ch);
+        $errorMessage = curl_error($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 
         curl_close($ch);
 
         $result['http_code'] = $httpCode ?: null;
 
-        if ($body === false || $errNo !== 0) {
-            $result['error'] = 'cURL error: ' . ($errMsg ?: 'unknown');
+        if ($body === false || $errorNumber !== 0) {
+            $result['error'] = 'cURL error: ' . ($errorMessage ?: 'unknown');
             return $result;
         }
 
@@ -54,7 +54,7 @@ final class StatusChecker
 
         $decoded = json_decode($body, true);
 
-        if (json_last_error() === JSON_ERROR_NONE) {
+        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
             $result['json'] = $decoded;
         }
 

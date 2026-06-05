@@ -7,14 +7,18 @@ namespace App\Domain\Status;
 interface DowntimeRepository
 {
     public function startDowntime(
-        string $service,
-        ?int $httpCode = null,
-        ?string $reason = null
+        int $endpointId,
+        ?int $httpCode,
+        ?string $reason
     ): void;
 
-    public function endDowntime(string $service): void;
+    public function endDowntime(int $endpointId): void;
 
-    public function isCurrentlyDown(string $service): bool;
+    public function isCurrentlyDown(int $endpointId): bool;
 
-    public function getDailyStats(string $service): array;
+    public function getStats(
+        int $endpointId,
+        int $periodHours = 48,
+        int $slotCount = 24
+    ): array;
 }

@@ -12,37 +12,48 @@ final class DowntimeService
         private DowntimeRepository $repository
     ) {}
 
-    public function handleCheck(string $service, array $result): array
+    public function handleCheck(array $endpoint, array $result): array
     {
+        $endpointId = (int) $endpoint['id'];
         $httpCode = $result['http_code'] ?? null;
-        $error = $result['error'] ?? null;
-        $uptimeUnit = (int)($result['uptime_unit'] ?? 1);
 
-        $write = isset($result['json']['uptime']) ? 'uptime' : (isset($result['json']['uptimeMs']) ? 'uptimeMs' : null);
-        $hasUptime = isset($result['json'][$write]) && $result['json'][$write] !== '';
-
-        $isDown = $httpCode < 200
-            || $httpCode >= 300
-            || !isset($result['json'])
-            || !$hasUptime
-            || $result['json']["status"] === 'down';
+        $isDown = $this->isResultDown($result);
 
         if ($isDown) {
             $this->repository->startDowntime(
-                $service,
+                $endpointId,
                 $httpCode,
-                $error ?? 'HTTP 502'
+                $result['error'] ?? 'Service down'
             );
         } else {
-            $this->repository->endDowntime($service);
+            $this->repository->endDowntime($endpointId);
         }
 
-        if($hasUptime){
-            $result['json']['uptime'] /= $uptimeUnit;
-        }
-
-        $result['history'] = $this->repository->getDailyStats($service);
+        $result['history'] = $this->repository->getStats($endpointId, 48, 24);
 
         return $result;
+    }
+
+    private function isResultDown(array $result): bool
+    {
+        $httpCode = $result['http_code'] ?? null;
+
+        if ($httpCode === null) {
+            return true;
+        }
+
+        if (!empty($result['error'])) {
+            return true;
+        }
+
+        if ($httpCode === 502) {
+            return true;
+        }
+
+        if ($httpCode >= 500) {
+            return true;
+        }
+
+        return false;
     }
 }

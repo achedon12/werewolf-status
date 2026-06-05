@@ -6,7 +6,9 @@ namespace App\Application\Actions\Status;
 
 use App\Application\Service\DowntimeService;
 use App\Application\Service\StatusChecker;
-use App\Infrastructure\Persistence\Status\JsonDowntimeRepository;
+use App\Infrastructure\Persistence\Database\ConnectionFactory;
+use App\Infrastructure\Persistence\Status\PdoDowntimeRepository;
+use App\Infrastructure\Persistence\Status\PdoEndpointRepository;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 
@@ -14,55 +16,32 @@ final class GetStatusAction
 {
     public function __invoke(Request $request, Response $response): Response
     {
-        $endpoints = [
-            'Jeu Loups Garous' => [
-                'public_url' => 'https://loupsgarous.net/',
-                'check_url' => 'https://loupsgarous.net/api/health',
-                'uptime_unit' => 1
-            ] ,
-            'Status Loups Garous' => [
-                'public_url' => 'https://status.loupsgarous.net',
-                'check_url' => 'https://status.loupsgarous.net',
-                'uptime_unit' => 1
-            ],
-            "Bot Discord Loups Garous" => [
-                'public_url' => 'https://discord.gg/ybX6WFa4qx',
-                'check_url' => 'https://loupsgarous.net/bot/health',
-                'uptime_unit' => 1000
-            ]
-        ];
+        $pdo = ConnectionFactory::create();
+
+        $endpointRepository = new PdoEndpointRepository($pdo);
+        $downtimeRepository = new PdoDowntimeRepository($pdo);
 
         $checker = new StatusChecker();
-
-        $repository = new JsonDowntimeRepository(
-            __DIR__ . '/../../../../data/downtimes.json'
-        );
-
-        $downtimeService = new DowntimeService($repository);
+        $downtimeService = new DowntimeService($downtimeRepository);
 
         $results = [];
 
-        foreach ($endpoints as $name => $endpoint) {
+        foreach ($endpointRepository->findEnabled() as $endpoint) {
             $result = $checker->check($endpoint['check_url']);
 
+            $result['id'] = (int) $endpoint['id'];
             $result['public_url'] = $endpoint['public_url'];
             $result['check_url'] = $endpoint['check_url'];
             $result['uptime_unit'] = $endpoint['uptime_unit'];
 
-            $results[$name] = $downtimeService->handleCheck($name, $result);
+            $results[$endpoint['name']] = $downtimeService->handleCheck($result, $result);
         }
-
-        $infos = $checker->check('https://loupsgarous.net/api/infos');
 
         $payload = [
             'results' => $results,
-            'infos' => $infos,
         ];
 
-        $response->getBody()->write(json_encode(
-            $payload,
-            JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT
-        ));
+        $response->getBody()->write(json_encode($payload, JSON_UNESCAPED_UNICODE));
 
         return $response->withHeader('Content-Type', 'application/json');
     }

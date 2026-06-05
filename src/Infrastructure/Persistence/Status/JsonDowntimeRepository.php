@@ -13,27 +13,27 @@ final class JsonDowntimeRepository implements DowntimeRepository
     ) {}
 
     public function startDowntime(
-        string $service,
+        int $endpointId,
         ?int $httpCode = null,
         ?string $reason = null
     ): void {
         $data = $this->read();
 
-        if (!isset($data['services'][$service])) {
-            $data['services'][$service] = $this->emptyService();
+        if (!isset($data['services'][$endpointId])) {
+            $data['services'][$endpointId] = $this->emptyService();
         }
 
-        if ($data['services'][$service]['current_status'] === 'down') {
+        if ($data['services'][$endpointId]['current_status'] === 'down') {
             return;
         }
 
         $now = date('c');
 
-        $data['services'][$service]['current_status'] = 'down';
-        $data['services'][$service]['current_down_started_at'] = $now;
+        $data['services'][$endpointId]['current_status'] = 'down';
+        $data['services'][$endpointId]['current_down_started_at'] = $now;
 
-        $data['services'][$service]['events'][] = [
-            'service' => $service,
+        $data['services'][$endpointId]['events'][] = [
+            'service' => $endpointId,
             'down_at' => $now,
             'up_at' => null,
             'http_code' => $httpCode,
@@ -43,40 +43,40 @@ final class JsonDowntimeRepository implements DowntimeRepository
         $this->write($data);
     }
 
-    public function endDowntime(string $service): void
+    public function endDowntime(int $endpointId): void
     {
         $data = $this->read();
 
-        if (!isset($data['services'][$service])) {
-            $data['services'][$service] = $this->emptyService();
+        if (!isset($data['services'][$endpointId])) {
+            $data['services'][$endpointId] = $this->emptyService();
         }
 
-        if ($data['services'][$service]['current_status'] === 'up') {
+        if ($data['services'][$endpointId]['current_status'] === 'up') {
             return;
         }
 
         $now = date('c');
 
-        $data['services'][$service]['current_status'] = 'up';
-        $data['services'][$service]['current_down_started_at'] = null;
+        $data['services'][$endpointId]['current_status'] = 'up';
+        $data['services'][$endpointId]['current_down_started_at'] = null;
 
-        $lastIndex = count($data['services'][$service]['events']) - 1;
+        $lastIndex = count($data['services'][$endpointId]['events']) - 1;
 
         if (
             $lastIndex >= 0
-            && $data['services'][$service]['events'][$lastIndex]['up_at'] === null
+            && $data['services'][$endpointId]['events'][$lastIndex]['up_at'] === null
         ) {
-            $data['services'][$service]['events'][$lastIndex]['up_at'] = $now;
+            $data['services'][$endpointId]['events'][$lastIndex]['up_at'] = $now;
         }
 
         $this->write($data);
     }
 
-    public function isCurrentlyDown(string $service): bool
+    public function isCurrentlyDown(int $endpointId): bool
     {
         $data = $this->read();
 
-        return ($data['services'][$service]['current_status'] ?? 'up') === 'down';
+        return ($data['services'][$endpointId]['current_status'] ?? 'up') === 'down';
     }
 
     public function getDailyStats(string $service): array
@@ -85,14 +85,15 @@ final class JsonDowntimeRepository implements DowntimeRepository
         $events = $data['services'][$service]['events'] ?? [];
 
         $now = time();
-        $periodStart = $now - (24 * 3600);
+        $periodHours = 48;
+        $slotCount = 24;
+        $slotDuration = 2 * 3600;
 
-        $slots = [];
-        $totalDowntimeSeconds = 0;
+        $periodStart = $now - ($periodHours * 3600);
 
-        for ($i = 0; $i < 24; $i++) {
-            $slotStart = $periodStart + ($i * 3600);
-            $slotEnd = $slotStart + 3600;
+        for ($i = 0; $i < $slotCount; $i++) {
+            $slotStart = $periodStart + ($i * $slotDuration);
+            $slotEnd = $slotStart + $slotDuration;
 
             $downtimeSecondsInSlot = 0;
             $startedAgo = null;
@@ -122,12 +123,13 @@ final class JsonDowntimeRepository implements DowntimeRepository
                 }
             }
 
-            $downtimeSecondsInSlot = min($downtimeSecondsInSlot, 3600);
+            $downtimeSecondsInSlot = min($downtimeSecondsInSlot, $slotDuration);
+            $totalDowntimeSeconds = 0;
             $totalDowntimeSeconds += $downtimeSecondsInSlot;
 
             if ($downtimeSecondsInSlot === 0) {
                 $status = 'up';
-            } elseif ($downtimeSecondsInSlot >= 3600) {
+            } elseif ($downtimeSecondsInSlot >= $slotDuration) {
                 $status = 'down';
             } else {
                 $status = 'partial';
@@ -145,7 +147,7 @@ final class JsonDowntimeRepository implements DowntimeRepository
             ];
         }
 
-        $totalPeriodSeconds = 24 * 3600;
+        $totalPeriodSeconds = $periodHours  * 3600;
         $uptimePercent = round((($totalPeriodSeconds - $totalDowntimeSeconds) / $totalPeriodSeconds) * 100, 2);
 
         return [
@@ -162,6 +164,8 @@ final class JsonDowntimeRepository implements DowntimeRepository
             'uptime_percent' => $uptimePercent,
             'period_start' => date('Y-m-d H:i:s', $periodStart),
             'period_end' => date('Y-m-d H:i:s', $now),
+            'period_hours' => $periodHours,
+            'slot_duration_seconds' => $slotDuration,
         ];
     }
 
@@ -243,5 +247,10 @@ final class JsonDowntimeRepository implements DowntimeRepository
             json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
             LOCK_EX
         );
+    }
+
+    public function getStats(int $endpointId, int $periodHours = 48, int $slotCount = 24): array
+    {
+        return [];
     }
 }
