@@ -82,7 +82,7 @@ final class PdoAdminUserRepository implements AdminUserRepository
 
         $stmt->execute([
             'id' => $id,
-            'password_hash' => password_hash($password, PASSWORD_DEFAULT),
+            'password_hash' => password_hash($password, PASSWORD_ARGON2ID),
         ]);
     }
 
