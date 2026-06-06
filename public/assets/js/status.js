@@ -160,7 +160,7 @@ async function refreshStatus() {
 
         renderServices(data.results);
         updateGlobalStatus(data.results);
-        updateUpdatedAt();
+        updateUpdatedAt(data.cached_at);
 
         refreshCountdown = Math.floor(REFRESH_INTERVAL / 1000);
         updateRefreshCountdown();
@@ -351,14 +351,20 @@ function formatDuration(startedAt) {
     return parts.length > 0 ? parts.join(' ') : `${seconds}s`;
 }
 
-function updateUpdatedAt() {
+function updateUpdatedAt(cachedAt = null) {
     const element = document.getElementById('update-time');
 
     if (!element) {
         return;
     }
 
+    if (cachedAt) {
+        element.textContent = cachedAt;
+        return;
+    }
+
     const now = new Date();
+
     element.textContent =
         now.getFullYear() + '-' +
         String(now.getMonth() + 1).padStart(2, '0') + '-' +

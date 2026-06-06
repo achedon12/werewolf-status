@@ -60,7 +60,7 @@ $status = getGlobalStatusData($results);
     </div>
 
     <footer class="mt-6 text-slate-500">
-        <div>Mis à jour: <span id="update-time"><?= date('Y-m-d H:i:s') ?></span></div>
+        <div>Mis à jour: <span id="update-time"><?= e($cachedAt ?? date('Y-m-d H:i:s')) ?></span></div>
         <div>Actualisation dans: <span id="refresh-countdown"><?= e(REFRESH_INTERVAL_SECONDS) ?>s</span></div>
     </footer>
 </div>

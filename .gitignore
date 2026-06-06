@@ -7,3 +7,5 @@
 !/logs/README.md
 .phpunit.result.cache
 .env
+var/cache/*
+!var/cache/.gitkeep

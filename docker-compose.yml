@@ -1,18 +1,36 @@
-version: '3.7'
+version: '3.8'
 
 volumes:
     logs:
         driver: local
 
+    cache:
+        driver: local
+
 services:
     slim:
-        image: php:7-alpine
+        image: php:8.3
         working_dir: /var/www
         command: php -S 0.0.0.0:8080 -t public
         environment:
             docker: "true"
+        env_file:
+            - .env
         ports:
             - "8080:8080"
         volumes:
             - .:/var/www
             - logs:/var/www/logs
+            - cache:/var/www/var/cache
+    worker:
+        working_dir: /var/www
+        command: php bin/status-worker.php
+        volumes:
+            - .:/var/www
+            - logs:/var/www/logs
+            - cache:/var/www/var/cache
+        env_file:
+            - .env
+        environment:
+            docker: "true"
+        restart: unless-stopped
