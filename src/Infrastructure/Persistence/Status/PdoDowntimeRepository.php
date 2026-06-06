@@ -17,9 +17,9 @@ final class PdoDowntimeRepository implements DowntimeRepository
         int $endpointId,
         ?int $httpCode,
         ?string $reason
-    ): void {
+    ): ?array {
         if ($this->isCurrentlyDown($endpointId)) {
-            return;
+            return null;
         }
 
         $stmt = $this->pdo->prepare(
@@ -45,26 +45,38 @@ final class PdoDowntimeRepository implements DowntimeRepository
             'http_code' => $httpCode,
             'reason' => $reason,
         ]);
+
+        $downtimeId = (int) $this->pdo->lastInsertId();
+
+        return $this->findById($downtimeId);
     }
 
-    public function endDowntime(int $endpointId): void
+    public function endDowntime(int $endpointId): ?array
     {
+        $openDowntime = $this->findOpenByEndpointId($endpointId);
+
+        if ($openDowntime === null) {
+            return null;
+        }
+
         $stmt = $this->pdo->prepare(
             'UPDATE downtimes
-             SET up_at = NOW()
-             WHERE endpoint_id = :endpoint_id
-             AND up_at IS NULL'
+         SET up_at = NOW()
+         WHERE id = :id
+         AND up_at IS NULL'
         );
 
         $stmt->execute([
-            'endpoint_id' => $endpointId,
+            'id' => (int) $openDowntime['id'],
         ]);
+
+        return $this->findById((int) $openDowntime['id']);
     }
 
     public function isCurrentlyDown(int $endpointId): bool
     {
         $stmt = $this->pdo->prepare(
-            'SELECT COUNT(*) AS count
+            'SELECT COUNT(*) AS total
          FROM downtimes
          WHERE endpoint_id = :endpoint_id
          AND up_at IS NULL'
@@ -74,9 +86,7 @@ final class PdoDowntimeRepository implements DowntimeRepository
             'endpoint_id' => $endpointId,
         ]);
 
-        $row = $stmt->fetch();
-
-        return isset($row['count']) && (int) $row['count'] > 0;
+        return (int) $stmt->fetchColumn() > 0;
     }
 
     public function getStats(
@@ -237,5 +247,71 @@ final class PdoDowntimeRepository implements DowntimeRepository
         }
 
         return 'J' . $dayOffset;
+    }
+
+    public function findById(int $id): ?array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT *
+         FROM downtimes
+         WHERE id = :id
+         LIMIT 1'
+        );
+
+        $stmt->execute([
+            'id' => $id,
+        ]);
+
+        $downtime = $stmt->fetch();
+
+        return $downtime ?: null;
+    }
+
+    public function findOpenByEndpointId(int $endpointId): ?array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT *
+         FROM downtimes
+         WHERE endpoint_id = :endpoint_id
+         AND up_at IS NULL
+         ORDER BY down_at DESC
+         LIMIT 1'
+        );
+
+        $stmt->execute([
+            'endpoint_id' => $endpointId,
+        ]);
+
+        $downtime = $stmt->fetch();
+
+        return $downtime ?: null;
+    }
+
+    public function markDiscordDownNotified(int $downtimeId): void
+    {
+        $stmt = $this->pdo->prepare(
+            'UPDATE downtimes
+         SET discord_down_notified_at = NOW()
+         WHERE id = :id
+         AND discord_down_notified_at IS NULL'
+        );
+
+        $stmt->execute([
+            'id' => $downtimeId,
+        ]);
+    }
+
+    public function markDiscordUpNotified(int $downtimeId): void
+    {
+        $stmt = $this->pdo->prepare(
+            'UPDATE downtimes
+         SET discord_up_notified_at = NOW()
+         WHERE id = :id
+         AND discord_up_notified_at IS NULL'
+        );
+
+        $stmt->execute([
+            'id' => $downtimeId,
+        ]);
     }
 }

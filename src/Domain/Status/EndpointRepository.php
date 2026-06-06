@@ -17,7 +17,8 @@ interface EndpointRepository
         string $checkUrl,
         ?string $publicUrl,
         string $uptimeUnit,
-        bool $discordNotificationsEnabled
+        bool $discordNotificationsEnabled,
+        ?string $discordWebhookUrl
     ): int;
 
     public function update(
@@ -26,7 +27,8 @@ interface EndpointRepository
         string $checkUrl,
         ?string $publicUrl,
         string $uptimeUnit,
-        bool $discordNotificationsEnabled
+        bool $discordNotificationsEnabled,
+        ?string $discordWebhookUrl
     ): void;
 
     public function delete(int $id): void;

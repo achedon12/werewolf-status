@@ -10,9 +10,9 @@ interface DowntimeRepository
         int $endpointId,
         ?int $httpCode,
         ?string $reason
-    ): void;
+    ): ?array;
 
-    public function endDowntime(int $endpointId): void;
+    public function endDowntime(int $endpointId): ?array;
 
     public function isCurrentlyDown(int $endpointId): bool;
 
@@ -21,4 +21,8 @@ interface DowntimeRepository
         int $periodHours = 48,
         int $slotCount = 24
     ): array;
+
+    public function markDiscordDownNotified(int $downtimeId): void;
+
+    public function markDiscordUpNotified(int $downtimeId): void;
 }

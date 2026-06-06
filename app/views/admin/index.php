@@ -215,16 +215,26 @@ $errorMessage = FlashService::getError();
             </div>
 
             <div class="lg:col-span-6 flex items-center justify-between">
-                <label class="flex items-center gap-2 text-sm text-slate-300">
-                    <input
-                        type="checkbox"
-                        name="discord_notifications_enabled"
-                        checked
-                        class="rounded border-slate-600 bg-slate-900"
-                    >
-                    Notifications Discord
-                </label>
-
+                <div>
+                    <label class="flex items-center gap-2 text-sm text-slate-300">
+                        <input
+                            type="checkbox"
+                            name="discord_notifications_enabled"
+                            checked
+                            class="rounded border-slate-600 bg-slate-900"
+                        >
+                        Notifications Discord
+                    </label>
+                    <div class="lg:col-span-3">
+                        <label class="block text-sm text-slate-300 mb-1">Webhook Discord</label>
+                        <input
+                                name="discord_webhook_url"
+                                type="url"
+                                placeholder="https://discord.com/api/webhooks/..."
+                                class="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-slate-100 outline-none focus:border-emerald-400"
+                        >
+                    </div>
+                </div>
                 <button
                     type="submit"
                     class="rounded-lg bg-emerald-400 px-4 py-2 font-bold text-slate-900 hover:bg-emerald-300 transition"
@@ -319,6 +329,16 @@ $errorMessage = FlashService::getError();
                                 >
                                 Notifications Discord
                             </label>
+                            <div class="lg:col-span-3">
+                                <label class="block text-sm text-slate-300 mb-1">Webhook Discord</label>
+                                <input
+                                        name="discord_webhook_url"
+                                        type="url"
+                                        value="<?= e($endpoint->getDiscordWebhookUrl()) ?>"
+                                        placeholder="https://discord.com/api/webhooks/..."
+                                        class="w-full rounded-lg bg-slate-950 border border-slate-700 px-3 py-2 text-slate-100 outline-none focus:border-emerald-400"
+                                >
+                            </div>
                         </div>
 
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full md:w-auto">

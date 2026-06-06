@@ -13,7 +13,8 @@ final class Endpoint
         private ?string $publicUrl,
         private string $uptimeUnit,
         private bool $isEnabled,
-        private bool $discordNotificationsEnabled
+        private bool $discordNotificationsEnabled,
+        private ?string $discordWebhookUrl
     ) {}
 
     public function getId(): int
@@ -51,6 +52,16 @@ final class Endpoint
         return $this->discordNotificationsEnabled;
     }
 
+    public function getDiscordWebhookUrl(): ?string
+    {
+        return $this->discordWebhookUrl;
+    }
+
+    public function hasDiscordWebhook(): bool
+    {
+        return $this->discordWebhookUrl !== null && $this->discordWebhookUrl !== '';
+    }
+
     public static function fromArray(array $data): self
     {
         return new self(
@@ -60,7 +71,8 @@ final class Endpoint
             $data['public_url'] !== null ? (string) $data['public_url'] : null,
             (string) ($data['uptime_unit'] ?? 'seconds'),
             (bool) $data['is_enabled'],
-            (bool) ($data['discord_notifications_enabled'] ?? true)
+            (bool) ($data['discord_notifications_enabled'] ?? true),
+            $data['discord_webhook_url'] !== null ? (string) $data['discord_webhook_url'] : null
         );
     }
 }

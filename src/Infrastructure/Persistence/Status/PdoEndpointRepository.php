@@ -50,26 +50,35 @@ final class PdoEndpointRepository implements EndpointRepository
     }
 
     public function create(
-        string $name, string $checkUrl, ?string $publicUrl, string $uptimeUnit, bool $discordNotificationsEnabled): int
-    {
+        string $name,
+        string $checkUrl,
+        ?string $publicUrl,
+        string $uptimeUnit,
+        bool $discordNotificationsEnabled,
+        ?string $discordWebhookUrl
+    ): int {
         $stmt = $this->pdo->prepare(
             'INSERT INTO endpoints (
-                name,
-                check_url,
-                public_url,
-                uptime_unit,
-                is_enabled,
-                created_at,
-                updated_at
-            ) VALUES (
-                :name,
-                :check_url,
-                :public_url,
-                :uptime_unit,
-                1,
-                NOW(),
-                NOW()
-            )'
+            name,
+            check_url,
+            public_url,
+            uptime_unit,
+            is_enabled,
+            discord_notifications_enabled,
+            discord_webhook_url,
+            created_at,
+            updated_at
+        ) VALUES (
+            :name,
+            :check_url,
+            :public_url,
+            :uptime_unit,
+            1,
+            :discord_notifications_enabled,
+            :discord_webhook_url,
+            NOW(),
+            NOW()
+        )'
         );
 
         $stmt->execute([
@@ -77,9 +86,11 @@ final class PdoEndpointRepository implements EndpointRepository
             'check_url' => $checkUrl,
             'public_url' => $publicUrl,
             'uptime_unit' => $uptimeUnit,
+            'discord_notifications_enabled' => $discordNotificationsEnabled ? 1 : 0,
+            'discord_webhook_url' => $discordWebhookUrl,
         ]);
 
-        return (int)$this->pdo->lastInsertId();
+        return (int) $this->pdo->lastInsertId();
     }
 
     public function findAll(): array
@@ -99,14 +110,14 @@ final class PdoEndpointRepository implements EndpointRepository
     }
 
     public function update(
-        int     $id,
-        string  $name,
-        string  $checkUrl,
+        int $id,
+        string $name,
+        string $checkUrl,
         ?string $publicUrl,
-        string  $uptimeUnit,
-        bool    $discordNotificationsEnabled
-    ): void
-    {
+        string $uptimeUnit,
+        bool $discordNotificationsEnabled,
+        ?string $discordWebhookUrl
+    ): void {
         $stmt = $this->pdo->prepare(
             'UPDATE endpoints
          SET name = :name,
@@ -114,6 +125,7 @@ final class PdoEndpointRepository implements EndpointRepository
              public_url = :public_url,
              uptime_unit = :uptime_unit,
              discord_notifications_enabled = :discord_notifications_enabled,
+             discord_webhook_url = :discord_webhook_url,
              updated_at = NOW()
          WHERE id = :id'
         );
@@ -125,6 +137,7 @@ final class PdoEndpointRepository implements EndpointRepository
             'public_url' => $publicUrl,
             'uptime_unit' => $uptimeUnit,
             'discord_notifications_enabled' => $discordNotificationsEnabled ? 1 : 0,
+            'discord_webhook_url' => $discordWebhookUrl,
         ]);
     }
 

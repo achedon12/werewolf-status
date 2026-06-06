@@ -26,6 +26,7 @@ final class CreateEndpointAction extends Action
         $publicUrl = trim((string) ($data['public_url'] ?? ''));
         $uptimeUnit = (string) ($data['uptime_unit'] ?? 'seconds');
         $discordEnabled = isset($data['discord_notifications_enabled']);
+        $discordWebhookUrl = trim((string) ($data['discord_webhook_url'] ?? ''));
 
         if ($name === '' || $checkUrl === '') {
             FlashService::error('Veuillez remplir tous les champs obligatoires.');
@@ -47,6 +48,11 @@ final class CreateEndpointAction extends Action
             return $this->redirect('/admin');
         }
 
+        if ($discordWebhookUrl !== '' && !filter_var($discordWebhookUrl, FILTER_VALIDATE_URL)) {
+            FlashService::error('Webhook Discord invalide.');
+            return $this->redirect('/admin');
+        }
+
         $pdo = ConnectionFactory::create();
         $endpointRepository = new PdoEndpointRepository($pdo);
 
@@ -55,7 +61,8 @@ final class CreateEndpointAction extends Action
             $checkUrl,
             $publicUrl !== '' ? $publicUrl : null,
             $uptimeUnit,
-            $discordEnabled
+            $discordEnabled,
+            $discordWebhookUrl !== '' ? $discordWebhookUrl : null
         );
 
         FlashService::success('Endpoint créé avec succès.');
