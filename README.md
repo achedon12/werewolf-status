@@ -1,39 +1,86 @@
 # LoupsGarous Status
 
-Status page pour l’écosystème LoupsGarous.
+> Status page basée sur SlimPHP 4 pour surveiller plusieurs endpoints, historiser les downtimes et afficher un état public clair.
 
-Ce projet permet de surveiller l’état de plusieurs services, de garder un historique des downtimes et d’afficher une page claire pour suivre la disponibilité des endpoints.
+## Sommaire
 
-Il fait partie d’un ensemble plus large autour de LoupsGarous, qui regroupe le site principal, des API, des outils de monitoring et une administration centralisée.
+* Présentation
+* Fonctionnement général
+* Fonctionnalités
+* Stack technique
+* Structure du projet
+* Prérequis
+* Variables d’environnement
+* Installation en local
+* Lancement avec Docker
+* Base de données
+* Migrations et seeds
+* Worker de monitoring
+* Notifications Discord
+* Déploiement en production
+* Commandes utiles
 
-## Objectif du projet
+## Présentation
 
-LoupsGarous Status sert à répondre à une question simple :
+LoupsGarous Status est une application de monitoring légère.
 
-> Est-ce que les services LoupsGarous sont disponibles en ce moment ?
+Elle sert à afficher l’état de plusieurs services depuis une page publique, tout en gardant un historique des périodes d’indisponibilité.
 
-L’application vérifie les endpoints configurés, détecte les pannes, sauvegarde les périodes de downtime en base SQL et affiche un historique visuel sur une période choisie.
+Le projet s’intègre dans un écosystème plus large autour de LoupsGarous, avec un site principal, des APIs, des endpoints de statut et une interface d’administration.
 
 ## Fonctionnement général
 
-Le projet fonctionne avec deux parties :
+Le projet est séparé en deux parties.
 
 ```txt
 Application web
-  → affiche la page publique
-  → affiche le panneau admin
-  → lit le dernier état depuis le cache
+  -> affiche la page publique
+  -> affiche le panneau admin
+  -> lit le dernier statut depuis un cache JSON
 
 Worker
-  → vérifie les endpoints toutes les 30 secondes
-  → sauvegarde les downtimes en SQL
-  → met à jour le cache JSON
-  → envoie les notifications Discord
+  -> vérifie les endpoints toutes les 30 secondes
+  -> sauvegarde les downtimes en SQL
+  -> génère le cache JSON
+  -> envoie les notifications Discord
 ```
 
-Les visiteurs ne lancent pas directement les checks HTTP vers les endpoints.
+Les visiteurs ne déclenchent pas les requêtes HTTP vers les endpoints surveillés.
 
-Ils lisent le dernier état généré par le worker.
+La page publique lit le dernier état généré par le worker.
+
+## Architecture de monitoring
+
+Avant :
+
+```txt
+Utilisateur
+  -> /api/status
+  -> check de tous les endpoints
+  -> sauvegarde SQL
+  -> réponse JSON
+```
+
+Maintenant :
+
+```txt
+Worker serveur toutes les 30 secondes
+  -> check de tous les endpoints
+  -> sauvegarde SQL
+  -> mise à jour du cache JSON
+
+Utilisateur
+  -> /api/status
+  -> lecture du cache JSON
+  -> affichage
+```
+
+Résultat :
+
+```txt
+1 visiteur ou 500 visiteurs
+  -> même nombre de checks vers les endpoints surveillés
+```
 
 ## Fonctionnalités
 
@@ -43,93 +90,56 @@ Ils lisent le dernier état généré par le worker.
 * Liste des endpoints surveillés
 * Pourcentage d’uptime
 * Historique visuel avec 24 carrés
-* Couleurs selon l’état du service
 * Affichage des downtimes partiels
-* Affichage de la version, de l’auteur et de l’email du projet surveillé
+* Couleurs selon l’état du service
+* Lecture depuis le cache JSON
 * Auto-refresh côté navigateur
-* Lecture depuis un cache généré par le worker
+* Infos projet via endpoint dédié
 
 ### Panneau admin
 
 * Connexion admin avec session PHP
 * Gestion des endpoints
-* Ajout d’un endpoint
-* Modification d’un endpoint
-* Suppression d’un endpoint
+* Ajout, modification et suppression d’endpoints
 * Activation ou désactivation d’un endpoint
 * Gestion de l’unité d’uptime
 * Gestion des admins
 * Modification de son propre mot de passe
 * Choix de la durée d’affichage
-* Gestion des notifications Discord par endpoint
+* Toggle pour les notifications Discord
 * Webhook Discord configurable par endpoint
 
 ### Monitoring
 
-* Sauvegarde des downtimes en SQL
 * Détection du début d’un downtime
 * Détection du retour en ligne
-* Calcul de l’uptime sur une période configurable
-* Support des downtimes complets et partiels
+* Historique SQL des downtimes
+* Calcul d’uptime sur une période configurable
+* Worker dédié aux checks
+* Cache JSON pour la page publique
 * Notifications Discord au début et à la fin d’un downtime
-* Cache JSON pour éviter de surcharger les endpoints surveillés
-
-## Architecture de monitoring
-
-Avant :
-
-```txt
-Utilisateur
-  → /api/status
-  → check tous les endpoints
-  → écrit les downtimes
-  → renvoie les résultats
-```
-
-Maintenant :
-
-```txt
-Worker serveur toutes les 30 secondes
-  → check tous les endpoints
-  → écrit les downtimes SQL
-  → écrit le cache JSON
-
-Utilisateur
-  → /api/status
-  → lit le cache JSON
-  → affiche les résultats
-```
-
-Résultat :
-
-```txt
-1 visiteur ou 500 visiteurs
-  → aucun check supplémentaire vers les endpoints surveillés
-```
 
 ## Couleurs de l’historique
 
 Chaque service affiche 24 carrés.
 
-La couleur dépend de l’état du créneau :
-
 ```txt
-Vert    = service en ligne pendant tout le créneau
-Orange  = downtime partiel pendant le créneau
-Rouge   = downtime complet pendant le créneau
-Gris    = service hors ligne ou statut inexploitable
+Vert    -> service en ligne pendant tout le créneau
+Orange  -> downtime partiel pendant le créneau
+Rouge   -> downtime complet pendant le créneau
+Gris    -> statut non disponible
 ```
 
-La durée d’un carré dépend de la durée d’affichage choisie dans l’admin.
+La durée d’un carré dépend du paramètre `display_period_hours`.
 
 Exemples :
 
 ```txt
-24h  = 1 carré vaut 1h
-48h  = 1 carré vaut 2h
-72h  = 1 carré vaut 3h
-168h = 1 carré vaut 7h
-720h = 1 carré vaut 30h
+24h  -> 1 carré vaut 1h
+48h  -> 1 carré vaut 2h
+72h  -> 1 carré vaut 3h
+168h -> 1 carré vaut 7h
+720h -> 1 carré vaut 30h
 ```
 
 ## Stack technique
@@ -139,6 +149,7 @@ Exemples :
 * PHP-DI
 * PDO
 * MySQL ou MariaDB
+* Phinx
 * TailwindCSS
 * JavaScript
 * Docker
@@ -163,6 +174,14 @@ app/
 bin/
   status-worker.php
 
+database/
+  schema.sql
+  migrations/
+    20260608154342_init_status_schema.php
+  seeds/
+    SettingsSeeder.php
+    AdminUserSeeder.php
+
 public/
   index.php
   favicon.ico
@@ -174,8 +193,6 @@ public/
 src/
   Application/
     Actions/
-      Admin/
-      Status/
     Middleware/
     Service/
 
@@ -186,22 +203,16 @@ src/
   Infrastructure/
     Notification/
     Persistence/
-      Admin/
-      Database/
-      Status/
-
-database/
-  schema.sql
-
-logs/
 
 var/
   cache/
+
+logs/
 ```
 
 ## Prérequis
 
-### Développement local
+### Local
 
 * PHP 8.3 ou supérieur
 * Composer
@@ -211,7 +222,7 @@ var/
 * Extension PHP mbstring
 * Extension PHP json
 
-### Développement avec Docker
+### Docker
 
 * Docker
 * Docker Compose
@@ -224,17 +235,17 @@ var/
 * Nginx ou Apache
 * PHP-FPM
 * Supervisor
-* Extension PHP PDO MySQL
-* Extension PHP cURL
-* Extension PHP mbstring
-* Extension PHP json
 * Git
 
 ## Variables d’environnement
 
-Crée un fichier `.env` à la racine du projet.
+Copie le fichier d’exemple :
 
-Exemple :
+```bash
+cp .env.example .env
+```
+
+Exemple local :
 
 ```env
 APP_ENV=dev
@@ -249,32 +260,13 @@ SESSION_SECURE=false
 
 STATUS_CHECK_INTERVAL=30
 
-INFO_URL=https://loupsgarous.net/api/infos
+INFO_URL=https://mon-endpoint.com/api/infos
 
-DISCORD_WEBHOOK_URL=
+ADMIN_USER_NAME=admin
+ADMIN_USER_PASSWORD=admin1234
 ```
 
-Avec Docker, utilise plutôt :
-
-```env
-APP_ENV=dev
-
-DB_HOST=db
-DB_PORT=3306
-DB_DATABASE=status_page
-DB_USERNAME=status_user
-DB_PASSWORD=status_password
-
-SESSION_SECURE=false
-
-STATUS_CHECK_INTERVAL=30
-
-INFO_URL=https://loupsgarous.net/api/infos
-
-DISCORD_WEBHOOK_URL=
-```
-
-En production avec HTTPS :
+Exemple production :
 
 ```env
 APP_ENV=prod
@@ -283,24 +275,25 @@ DB_HOST=127.0.0.1
 DB_PORT=3306
 DB_DATABASE=status_page
 DB_USERNAME=status_user
-DB_PASSWORD=mot_de_passe_fort
+DB_PASSWORD=change_this_password
 
 SESSION_SECURE=true
 
 STATUS_CHECK_INTERVAL=30
 
-INFO_URL=https://loupsgarous.net/api/infos
+INFO_URL=https://mon-endpoint.com/api/infos
 
-DISCORD_WEBHOOK_URL=
+ADMIN_USER_NAME=admin
+ADMIN_USER_PASSWORD=change_this_admin_password
 ```
 
-## Installation en développement local
+## Installation en local
 
 Clone le dépôt :
 
 ```bash
-git clone <url-du-repo>
-cd <nom-du-projet>
+git clone https://example.com/mon-organisation/loupsgarous-status.git
+cd loupsgarous-status
 ```
 
 Installe les dépendances :
@@ -309,24 +302,24 @@ Installe les dépendances :
 composer install
 ```
 
-Copie le fichier d’environnement :
+Configure `.env`.
 
-```bash
-cp .env.example .env
-```
-
-Configure `.env` avec tes accès SQL.
-
-Crée la base de données :
+Prépare la base :
 
 ```sql
 CREATE DATABASE status_page CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
 
-Importe le schéma :
+Lance les migrations :
 
 ```bash
-mysql -u root -p status_page < database/schema.sql
+composer migrate
+```
+
+Lance les seeds :
+
+```bash
+composer seed
 ```
 
 Lance l’application web :
@@ -341,32 +334,15 @@ Dans un deuxième terminal, lance le worker :
 php bin/status-worker.php
 ```
 
-Ouvre le projet :
+Accès local :
 
 ```txt
-http://localhost:8080
+Page publique : http://localhost:8080
+Admin : http://localhost:8080/admin/login
+API : http://localhost:8080/api/status
 ```
 
-Ouvre le panneau admin :
-
-```txt
-http://localhost:8080/admin/login
-```
-
-## Développement avec Docker
-
-Le projet contient deux services importants :
-
-```txt
-slim
-  → application web
-
-worker
-  → check des endpoints toutes les 30 secondes
-
-db
-  → base MariaDB
-```
+## Lancement avec Docker
 
 Lance les conteneurs :
 
@@ -380,28 +356,35 @@ Installe les dépendances si nécessaire :
 docker-compose exec slim composer install
 ```
 
-Importe le schéma SQL :
+Lance les migrations :
 
 ```bash
-docker-compose exec db mysql -u status_user -pstatus_password status_page < database/schema.sql
+docker-compose exec slim composer migrate
 ```
 
-Regarde les logs de l’application :
+Lance les seeds :
+
+```bash
+docker-compose exec slim composer seed
+```
+
+Logs de l’application :
 
 ```bash
 docker-compose logs -f slim
 ```
 
-Regarde les logs du worker :
+Logs du worker :
 
 ```bash
 docker-compose logs -f worker
 ```
 
-Ouvre le projet :
+Accès :
 
 ```txt
-http://localhost:8080
+Page publique : http://localhost:8080
+Admin : http://localhost:8080/admin/login
 ```
 
 ## Exemple de docker-compose.yml
@@ -449,20 +432,6 @@ services:
       - db
     restart: unless-stopped
 
-  db:
-    image: mariadb:11
-    container_name: loupsgarous-status-db
-    restart: unless-stopped
-    environment:
-      MARIADB_DATABASE: status_page
-      MARIADB_USER: status_user
-      MARIADB_PASSWORD: status_password
-      MARIADB_ROOT_PASSWORD: root_password
-    ports:
-      - "3306:3306"
-    volumes:
-      - db_data:/var/lib/mysql
-
 volumes:
   logs:
     driver: local
@@ -501,15 +470,13 @@ COPY . .
 RUN composer install
 ```
 
-## Configuration SQL
+## Base de données
 
 Le projet utilise 4 tables principales.
 
 ### endpoints
 
-Contient les services surveillés.
-
-Champs importants :
+Stocke les services surveillés.
 
 ```txt
 id
@@ -526,9 +493,7 @@ updated_at
 
 ### downtimes
 
-Contient l’historique des pannes.
-
-Champs importants :
+Stocke l’historique des pannes.
 
 ```txt
 id
@@ -550,130 +515,80 @@ up_at = NULL
 
 ### settings
 
-Contient les paramètres globaux.
-
-Exemple :
-
-```txt
-display_period_hours
-```
-
-Valeurs supportées :
-
-```txt
-1
-3
-6
-12
-24
-48
-72
-168
-336
-720
-```
-
-### admin_users
-
-Contient les comptes admin.
-
-Les mots de passe sont stockés avec `password_hash()`.
-
-## Ajouter un premier admin
-
-Génère un hash :
-
-```bash
-php -r "echo password_hash('motdepasse', PASSWORD_DEFAULT);"
-```
-
-Ajoute l’admin en SQL :
-
-```sql
-INSERT INTO admin_users (
-    username,
-    password_hash,
-    role,
-    is_enabled,
-    created_at,
-    updated_at
-) VALUES (
-    'admin',
-    'HASH_ICI',
-    'admin',
-    1,
-    NOW(),
-    NOW()
-);
-```
-
-Connexion admin :
-
-```txt
-http://localhost:8080/admin/login
-```
-
-## Ajouter un endpoint
-
-Un endpoint se configure avec :
-
-```txt
-Nom
-URL de check
-URL publique
-Unité d’uptime
-Notifications Discord
-Webhook Discord
-```
-
-Exemple :
-
-```txt
-Nom : Loups Garous
-URL de check : https://loupsgarous.net/api/health
-URL publique : https://loupsgarous.net
-Uptime : seconds
-Notifications Discord : activées
-Webhook Discord : https://discord.com/api/webhooks/...
-```
-
-## Unités d’uptime supportées
-
-```txt
-seconds
-milliseconds
-timestamp_seconds
-timestamp_milliseconds
-```
+Stocke les paramètres globaux.
 
 Exemples :
 
 ```txt
-3600 avec seconds = 1h
-3600000 avec milliseconds = 1h
-1717600000 avec timestamp_seconds = timestamp Unix
-1717600000000 avec timestamp_milliseconds = timestamp Unix en ms
+display_period_hours
+status_check_interval
+```
+
+### admin_users
+
+Stocke les comptes admin.
+
+Les mots de passe sont stockés avec `password_hash()`.
+
+## Migrations et seeds
+
+Le projet utilise Phinx.
+
+### Migrations
+
+Les migrations gèrent la structure SQL.
+
+```bash
+composer migrate
+```
+
+Statut des migrations :
+
+```bash
+composer status-db
+```
+
+Rollback :
+
+```bash
+composer rollback
+```
+
+### Seeds
+
+Les seeds ajoutent les données de départ.
+
+```bash
+composer seed
+```
+
+Seeds actuels :
+
+```txt
+SettingsSeeder.php
+  -> ajoute les paramètres par défaut
+
+AdminUserSeeder.php
+  -> ajoute ou met à jour l’admin défini dans .env
 ```
 
 ## Cache status
 
-Le dernier état des services est stocké ici :
+Le worker génère le fichier :
 
 ```txt
 var/cache/status_snapshot.json
 ```
 
-Ce fichier est généré par le worker.
-
 La page publique et `/api/status` lisent ce fichier.
 
-Si ce fichier n’existe pas encore, il faut lancer :
+Si la page indique que le cache n’existe pas, lance le worker :
 
 ```bash
 php bin/status-worker.php
 ```
 
-ou, avec Docker :
+Avec Docker :
 
 ```bash
 docker-compose logs -f worker
@@ -681,42 +596,37 @@ docker-compose logs -f worker
 
 ## Notifications Discord
 
-Chaque endpoint peut avoir son propre webhook Discord.
+Chaque endpoint dispose de son propre webhook Discord.
 
 Quand un endpoint tombe :
 
 ```txt
-downtime créé
+downtime ouvert
 notification Discord envoyée
 discord_down_notified_at rempli
-```
-
-Tant que le downtime reste ouvert :
-
-```txt
-aucune nouvelle notification
 ```
 
 Quand l’endpoint revient en ligne :
 
 ```txt
-up_at rempli
-notification Discord de retour envoyée
+downtime fermé
+notification Discord envoyée
 discord_up_notified_at rempli
 ```
 
-Quand il retombe plus tard :
+Tant que le downtime reste ouvert, aucune notification supplémentaire n’est envoyée.
+
+Exemple de webhook fictif :
 
 ```txt
-nouveau downtime
-nouvelle notification possible
+https://discord.com/api/webhooks/example/example-token
 ```
 
 ## Routes principales
 
 ```txt
 GET  /                  Page publique de status
-GET  /api/status        API utilisée par le frontend
+GET  /api/status        API lue par le frontend
 
 GET  /admin/login       Page de connexion admin
 POST /admin/login       Connexion admin
@@ -739,123 +649,55 @@ POST /admin/admins/{id}/delete
 
 ## Déploiement en production
 
-Cette section décrit une méthode simple pour déployer le projet sur un serveur Linux avec Git, Composer, PHP-FPM, Nginx, Supervisor et MySQL ou MariaDB.
+### Préparation
 
-### Préparer le projet
-
-Clone le dépôt sur le serveur :
+Clone le dépôt :
 
 ```bash
 cd /var/www
-git clone <url-du-repo> loupsgarous-status
+git clone https://example.com/mon-organisation/loupsgarous-status.git
 cd loupsgarous-status
 ```
 
-Installe les dépendances en mode production :
+Installe les dépendances :
 
 ```bash
 composer install --no-dev --optimize-autoloader
 ```
 
-Copie le fichier d’environnement :
+Configure `.env`.
+
+Prépare les dossiers :
 
 ```bash
-cp .env.example .env
+mkdir -p logs
+mkdir -p var/cache
 ```
 
-Configure `.env` :
-
-```env
-APP_ENV=prod
-
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_DATABASE=status_page
-DB_USERNAME=status_user
-DB_PASSWORD=mot_de_passe_fort
-
-SESSION_SECURE=true
-
-STATUS_CHECK_INTERVAL=30
-
-INFO_URL=https://loupsgarous.net/api/infos
-
-DISCORD_WEBHOOK_URL=
-```
-
-### Préparer la base de données
-
-Connecte-toi à MySQL :
+Permissions :
 
 ```bash
-mysql -u root -p
-```
-
-Crée la base et l’utilisateur :
-
-```sql
-CREATE DATABASE status_page CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
-CREATE USER 'status_user'@'localhost' IDENTIFIED BY 'mot_de_passe_fort';
-
-GRANT ALL PRIVILEGES ON status_page.* TO 'status_user'@'localhost';
-
-FLUSH PRIVILEGES;
-```
-
-Importe le schéma :
-
-```bash
-mysql -u status_user -p status_page < database/schema.sql
-```
-
-### Ajouter le premier admin en production
-
-Génère un hash :
-
-```bash
-php -r "echo password_hash('motdepasse', PASSWORD_DEFAULT);"
-```
-
-Ajoute l’admin :
-
-```sql
-INSERT INTO admin_users (
-    username,
-    password_hash,
-    role,
-    is_enabled,
-    created_at,
-    updated_at
-) VALUES (
-    'admin',
-    'HASH_ICI',
-    'admin',
-    1,
-    NOW(),
-    NOW()
-);
-```
-
-### Permissions
-
-Le dossier `logs/` doit être accessible en écriture par PHP.
-
-Le dossier `var/cache/` doit aussi être accessible en écriture par le worker et par PHP.
-
-```bash
-sudo mkdir -p logs
-sudo mkdir -p var/cache
-
 sudo chown -R www-data:www-data /var/www/loupsgarous-status
 sudo chmod -R 755 /var/www/loupsgarous-status
 sudo chmod -R 775 /var/www/loupsgarous-status/logs
 sudo chmod -R 775 /var/www/loupsgarous-status/var/cache
 ```
 
-### Configuration Nginx
+Lance les migrations :
 
-Exemple de configuration :
+```bash
+composer migrate
+```
+
+Lance les seeds au premier setup :
+
+```bash
+composer seed
+```
+
+### Nginx
+
+Exemple :
 
 ```nginx
 server {
@@ -893,37 +735,25 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-### HTTPS avec Certbot
+### HTTPS
 
-Installe Certbot :
-
-```bash
-sudo apt install certbot python3-certbot-nginx
-```
-
-Génère le certificat :
+Avec Certbot :
 
 ```bash
 sudo certbot --nginx -d status.example.com
 ```
 
-Après HTTPS, vérifie dans `.env` :
+Dans `.env`, garde :
 
 ```env
 SESSION_SECURE=true
 ```
 
-### Lancer le worker avec Supervisor
+### Worker avec Supervisor
 
-Le worker doit tourner en permanence en production.
+Le worker doit tourner en continu.
 
-Installe Supervisor :
-
-```bash
-sudo apt install supervisor
-```
-
-Crée le fichier :
+Fichier :
 
 ```txt
 /etc/supervisor/conf.d/loupsgarous-status-worker.conf
@@ -950,288 +780,93 @@ sudo supervisorctl update
 sudo supervisorctl start loupsgarous-status-worker
 ```
 
-Vérifie le worker :
+Vérification :
 
 ```bash
 sudo supervisorctl status
 ```
 
-Logs du worker :
-
-```bash
-tail -f logs/status-worker.out.log
-tail -f logs/status-worker.err.log
-```
-
-### Déployer une mise à jour
-
-À chaque mise à jour :
+## Mise à jour en production
 
 ```bash
 cd /var/www/loupsgarous-status
 git pull
 composer install --no-dev --optimize-autoloader
+composer migrate
 composer dump-autoload
-```
-
-Si le schéma SQL change, applique les nouvelles requêtes SQL nécessaires.
-
-Recharge PHP-FPM :
-
-```bash
 sudo systemctl reload php8.3-fpm
-```
-
-Recharge Nginx :
-
-```bash
 sudo systemctl reload nginx
-```
-
-Redémarre le worker :
-
-```bash
 sudo supervisorctl restart loupsgarous-status-worker
-```
-
-### Vérifications après déploiement
-
-Vérifie la page publique :
-
-```txt
-https://status.example.com
-```
-
-Vérifie l’API :
-
-```txt
-https://status.example.com/api/status
-```
-
-Vérifie l’admin :
-
-```txt
-https://status.example.com/admin/login
-```
-
-Vérifie que le cache existe :
-
-```bash
-ls -la var/cache
-cat var/cache/status_snapshot.json
-```
-
-Vérifie les logs :
-
-```bash
-tail -f logs/app.log
-tail -f logs/status-worker.out.log
-tail -f logs/status-worker.err.log
-tail -f /var/log/nginx/loupsgarous-status.error.log
-```
-
-## Déploiement en production avec Docker
-
-Clone le dépôt :
-
-```bash
-git clone <url-du-repo> loupsgarous-status
-cd loupsgarous-status
-cp .env.example .env
-```
-
-Configure `.env` avec :
-
-```env
-DB_HOST=db
-DB_PORT=3306
-DB_DATABASE=status_page
-DB_USERNAME=status_user
-DB_PASSWORD=status_password
-
-SESSION_SECURE=true
-
-STATUS_CHECK_INTERVAL=30
-```
-
-Lance les conteneurs :
-
-```bash
-docker-compose up -d --build
-```
-
-Importe le schéma SQL :
-
-```bash
-docker-compose exec db mysql -u status_user -pstatus_password status_page < database/schema.sql
-```
-
-Vérifie les logs :
-
-```bash
-docker-compose logs -f slim
-docker-compose logs -f worker
-```
-
-Mettre à jour en Docker :
-
-```bash
-git pull
-docker-compose up -d --build
-docker-compose exec slim composer install --no-dev --optimize-autoloader
-docker-compose restart worker
-```
-
-## Points importants en production
-
-Ne versionne jamais le fichier `.env`.
-
-Garde `APP_ENV=prod`.
-
-Utilise `SESSION_SECURE=true` si le site est en HTTPS.
-
-Utilise un mot de passe SQL fort.
-
-Garde le dossier `public/` comme racine web.
-
-Ne pointe jamais Nginx ou Apache vers la racine complète du projet.
-
-Le worker doit toujours tourner.
-
-Le cache `var/cache/status_snapshot.json` doit être généré par le worker.
-
-Sauvegarde régulièrement la base SQL.
-
-La base contient :
-
-```txt
-endpoints
-admins
-settings
-historique des downtimes
 ```
 
 ## Commandes utiles
 
-Régénérer l’autoload :
-
 ```bash
 composer dump-autoload
-```
-
-Vérifier un fichier PHP :
-
-```bash
-php -l chemin/du/fichier.php
-```
-
-Lancer l’application web en local :
-
-```bash
+composer migrate
+composer rollback
+composer status-db
+composer seed
+composer test
 composer start
-```
-
-Lancer le worker en local :
-
-```bash
 php bin/status-worker.php
 ```
 
-Lancer avec Docker :
+Avec Docker :
 
 ```bash
 docker-compose up -d --build
-```
-
-Arrêter Docker :
-
-```bash
 docker-compose down
-```
-
-Voir les logs Docker :
-
-```bash
 docker-compose logs -f slim
 docker-compose logs -f worker
-docker-compose logs -f db
+docker-compose exec slim composer migrate
+docker-compose exec slim composer seed
 ```
 
-Lancer les tests :
+## Sécurité
 
-```bash
-composer test
-```
-
-## Architecture
-
-Le projet suit une organisation proche du skeleton SlimPHP.
+Ne versionne jamais :
 
 ```txt
-Application
-  Actions HTTP
-  Services métier
-  Middlewares
-
-Domain
-  Objets métier
-  Interfaces
-
-Infrastructure
-  Repositories SQL
-  Connexion DB
-  Notifications externes
-
-Views
-  Pages PHP
-  Partials d’affichage
-
-Public
-  Point d’entrée
-  Assets accessibles par le navigateur
-
-Worker
-  Génération périodique du cache
-  Checks HTTP
-  Notifications Discord
+.env
+var/cache/status_snapshot.json
+logs/*
 ```
 
-## Règles de développement
+Vérifie que `.gitignore` contient :
 
-Les routes restent simples.
+```txt
+.env
+logs/*
+var/cache/*
+!var/cache/.gitkeep
+```
 
-La logique métier va dans les services.
+En production :
 
-Les requêtes SQL vont dans les repositories.
-
-Les vues gèrent l’affichage.
-
-Les endpoints ne sont pas codés en dur.
-
-Les downtimes sont stockés en SQL.
-
-Les résultats affichés sont lus depuis le cache.
-
-Les checks HTTP sont faits par le worker.
-
-Les actions admin passent par des sessions protégées.
+* utilise HTTPS
+* garde `SESSION_SECURE=true`
+* utilise des mots de passe forts
+* protège les accès admin
+* sauvegarde régulièrement la base SQL
+* ne publie jamais les webhooks Discord
+* ne publie jamais les identifiants SQL
 
 ## État du projet
 
 Le projet est en développement actif.
 
-Objectifs à venir :
+Pistes futures :
 
 ```txt
-Améliorer les notifications Discord
-Ajouter plus de statistiques
-Ajouter une vue historique détaillée
-Améliorer les rôles admin
-Ajouter des tests
-Améliorer l’interface mobile
-Ajouter un système d’audit admin
+Historique détaillé des incidents
+Audit log admin
+Rôles admin avancés
+Stats de temps de réponse
+Tests automatisés
+Page publique par endpoint
 ```
 
 ## Licence
 
-Projet privé lié à l’écosystème LoupsGarous.
+Voir `LICENSE.md`.
