@@ -9,28 +9,28 @@
 * Fonctionnalités
 * Stack technique
 * Structure du projet
-* Prérequis
 * Variables d’environnement
-* Installation en local
-* Lancement avec Docker
+* Installation locale
+* Installation Docker
 * Base de données
 * Migrations et seeds
 * Worker de monitoring
-* Notifications Discord
-* Déploiement en production
-* Commandes utiles
+* Tests
+* Qualité de code
+* Déploiement
+* Sécurité
 
 ## Présentation
 
 LoupsGarous Status est une application de monitoring légère.
 
-Elle sert à afficher l’état de plusieurs services depuis une page publique, tout en gardant un historique des périodes d’indisponibilité.
+Elle permet de surveiller plusieurs services depuis une page publique, tout en conservant un historique des périodes d’indisponibilité.
 
-Le projet s’intègre dans un écosystème plus large autour de LoupsGarous, avec un site principal, des APIs, des endpoints de statut et une interface d’administration.
+Le projet s’intègre dans un écosystème plus large autour de LoupsGarous, avec un site principal, des endpoints d’API, une page de statut et un panneau d’administration.
 
 ## Fonctionnement général
 
-Le projet est séparé en deux parties.
+Le projet fonctionne avec deux parties.
 
 ```txt
 Application web
@@ -45,7 +45,7 @@ Worker
   -> envoie les notifications Discord
 ```
 
-Les visiteurs ne déclenchent pas les requêtes HTTP vers les endpoints surveillés.
+Les visiteurs ne déclenchent pas directement les checks HTTP.
 
 La page publique lit le dernier état généré par le worker.
 
@@ -64,7 +64,7 @@ Utilisateur
 Maintenant :
 
 ```txt
-Worker serveur toutes les 30 secondes
+Worker toutes les 30 secondes
   -> check de tous les endpoints
   -> sauvegarde SQL
   -> mise à jour du cache JSON
@@ -150,6 +150,9 @@ Exemples :
 * PDO
 * MySQL ou MariaDB
 * Phinx
+* PHPUnit
+* PHP_CodeSniffer
+* PHPStan
 * TailwindCSS
 * JavaScript
 * Docker
@@ -195,6 +198,8 @@ src/
     Actions/
     Middleware/
     Service/
+    Support/
+      UptimeHelper.php
 
   Domain/
     Admin/
@@ -203,6 +208,26 @@ src/
   Infrastructure/
     Notification/
     Persistence/
+
+tests/
+  Application/
+    Service/
+      DowntimeServiceTest.php
+      StatusCheckerTest.php
+      StatusPayloadBuilderTest.php
+
+  Domain/
+    Status/
+      FakeDowntimeRepository.php
+
+  Infrastructure/
+    Persistence/
+      Status/
+        PdoSettingsRepositoryTest.php
+        StatusSnapshotRepositoryTest.php
+
+  Support/
+    UptimeHelperTest.php
 
 var/
   cache/
@@ -264,6 +289,32 @@ INFO_URL=https://mon-endpoint.com/api/infos
 
 ADMIN_USER_NAME=admin
 ADMIN_USER_PASSWORD=admin1234
+
+TEST_DB_HOST=127.0.0.1
+TEST_DB_DATABASE=status_page_test
+TEST_DB_USERNAME=root
+TEST_DB_PASSWORD=
+```
+
+Exemple Docker :
+
+```env
+APP_ENV=dev
+
+DB_HOST=db
+DB_PORT=3306
+DB_DATABASE=status_page
+DB_USERNAME=status_user
+DB_PASSWORD=status_password
+
+SESSION_SECURE=false
+
+STATUS_CHECK_INTERVAL=30
+
+INFO_URL=https://mon-endpoint.com/api/infos
+
+ADMIN_USER_NAME=admin
+ADMIN_USER_PASSWORD=admin1234
 ```
 
 Exemple production :
@@ -287,7 +338,7 @@ ADMIN_USER_NAME=admin
 ADMIN_USER_PASSWORD=change_this_admin_password
 ```
 
-## Installation en local
+## Installation locale
 
 Clone le dépôt :
 
@@ -304,10 +355,16 @@ composer install
 
 Configure `.env`.
 
-Prépare la base :
+Crée la base principale :
 
 ```sql
 CREATE DATABASE status_page CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
+
+Crée la base de test si tu veux lancer les tests PDO :
+
+```sql
+CREATE DATABASE status_page_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
 
 Lance les migrations :
@@ -342,7 +399,7 @@ Admin : http://localhost:8080/admin/login
 API : http://localhost:8080/api/status
 ```
 
-## Lancement avec Docker
+## Installation Docker
 
 Lance les conteneurs :
 
@@ -431,6 +488,20 @@ services:
     depends_on:
       - db
     restart: unless-stopped
+
+  db:
+    image: mariadb:11
+    container_name: loupsgarous-status-db
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: status_page
+      MARIADB_USER: status_user
+      MARIADB_PASSWORD: status_password
+      MARIADB_ROOT_PASSWORD: root_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
 
 volumes:
   logs:
@@ -554,6 +625,18 @@ Rollback :
 composer rollback
 ```
 
+Créer une migration :
+
+```bash
+vendor/bin/phinx create NomDeLaMigration
+```
+
+Avec Windows :
+
+```bash
+vendor\bin\phinx create NomDeLaMigration
+```
+
 ### Seeds
 
 Les seeds ajoutent les données de départ.
@@ -572,9 +655,24 @@ AdminUserSeeder.php
   -> ajoute ou met à jour l’admin défini dans .env
 ```
 
-## Cache status
+Les variables utilisées par `AdminUserSeeder` sont :
 
-Le worker génère le fichier :
+```env
+ADMIN_USER_NAME=admin
+ADMIN_USER_PASSWORD=admin1234
+```
+
+En production, utilise un mot de passe fort.
+
+## Worker de monitoring
+
+Le worker vérifie les endpoints à intervalle régulier.
+
+```bash
+php bin/status-worker.php
+```
+
+Il génère le fichier :
 
 ```txt
 var/cache/status_snapshot.json
@@ -582,11 +680,7 @@ var/cache/status_snapshot.json
 
 La page publique et `/api/status` lisent ce fichier.
 
-Si la page indique que le cache n’existe pas, lance le worker :
-
-```bash
-php bin/status-worker.php
-```
+Si le cache n’existe pas encore, lance le worker.
 
 Avec Docker :
 
@@ -620,6 +714,200 @@ Exemple de webhook fictif :
 
 ```txt
 https://discord.com/api/webhooks/example/example-token
+```
+
+Ne commit jamais un vrai webhook.
+
+## Tests
+
+Le projet utilise PHPUnit.
+
+Lancer les tests :
+
+```bash
+composer test
+```
+
+Ou directement :
+
+```bash
+vendor/bin/phpunit
+```
+
+Avec Windows :
+
+```bash
+vendor\bin\phpunit
+```
+
+### Structure des tests
+
+```txt
+tests/
+  Application/
+    Service/
+      DowntimeServiceTest.php
+      StatusCheckerTest.php
+      StatusPayloadBuilderTest.php
+
+  Domain/
+    Status/
+      FakeDowntimeRepository.php
+
+  Infrastructure/
+    Persistence/
+      Status/
+        PdoSettingsRepositoryTest.php
+        StatusSnapshotRepositoryTest.php
+
+  Support/
+    UptimeHelperTest.php
+```
+
+### Fakes de test
+
+Les fakes doivent rester dans `tests/`.
+
+Exemple :
+
+```txt
+tests/Domain/Status/FakeDowntimeRepository.php
+```
+
+Ne place pas les fakes dans `src/`.
+
+Règle :
+
+```txt
+src/   -> code de production
+tests/ -> tests, fakes, fixtures
+```
+
+### Base de test
+
+Certains tests utilisent une base de test.
+
+Variables :
+
+```env
+TEST_DB_HOST=127.0.0.1
+TEST_DB_DATABASE=status_page_test
+TEST_DB_USERNAME=root
+TEST_DB_PASSWORD=
+```
+
+Créer la base :
+
+```sql
+CREATE DATABASE status_page_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
+
+Si ces variables ne sont pas configurées, les tests PDO concernés sont ignorés.
+
+## Autoload de test
+
+Le projet utilise `autoload-dev` pour charger les tests et les fakes.
+
+Exemple dans `composer.json` :
+
+```json
+"autoload": {
+  "psr-4": {
+    "App\\": "src/"
+  }
+},
+"autoload-dev": {
+  "psr-4": {
+    "Application\\": "tests/Application/",
+    "Domain\\": "tests/Domain/",
+    "Infrastructure\\": "tests/Infrastructure/",
+    "Support\\": "tests/Support/"
+  }
+}
+```
+
+Après modification de l’autoload :
+
+```bash
+composer dump-autoload
+```
+
+## Qualité de code
+
+Le projet utilise PHP_CodeSniffer.
+
+Lancer l’analyse du style :
+
+```bash
+composer cs
+```
+
+Corriger automatiquement ce qui est corrigeable :
+
+```bash
+composer cs-fix
+```
+
+PHPCS vérifie notamment :
+
+```txt
+PSR-12
+indentation
+fins de ligne LF
+ligne vide en fin de fichier
+format des classes et méthodes
+```
+
+Le fichier `tests/bootstrap.php` est un fichier spécial PHPUnit. Il charge l’autoload et l’environnement. Si PHPCS signale un warning sur ce fichier, tu peux l’exclure dans `phpcs.xml`.
+
+Exemple :
+
+```xml
+<exclude-pattern>tests/bootstrap.php</exclude-pattern>
+```
+
+## PHPStan
+
+PHPStan sert à analyser le code sans l’exécuter.
+
+Lancer l’analyse :
+
+```bash
+composer analyse
+```
+
+Ou directement :
+
+```bash
+vendor/bin/phpstan analyse
+```
+
+PHPStan aide à repérer :
+
+```txt
+types incorrects
+méthodes inexistantes
+retours invalides
+variables possiblement null
+```
+
+## Scripts Composer conseillés
+
+Exemple :
+
+```json
+"scripts": {
+  "start": "php -S localhost:8080 -t public",
+  "test": "phpunit",
+  "cs": "phpcs",
+  "cs-fix": "phpcbf",
+  "analyse": "phpstan analyse",
+  "phinx": "phinx",
+  "migrate": "phinx migrate",
+  "rollback": "phinx rollback",
+  "status-db": "phinx status",
+  "seed": "phinx seed:run"
+}
 ```
 
 ## Routes principales
@@ -808,6 +1096,9 @@ composer rollback
 composer status-db
 composer seed
 composer test
+composer cs
+composer cs-fix
+composer analyse
 composer start
 php bin/status-worker.php
 ```
@@ -821,6 +1112,7 @@ docker-compose logs -f slim
 docker-compose logs -f worker
 docker-compose exec slim composer migrate
 docker-compose exec slim composer seed
+docker-compose exec slim composer test
 ```
 
 ## Sécurité
@@ -831,6 +1123,10 @@ Ne versionne jamais :
 .env
 var/cache/status_snapshot.json
 logs/*
+vrais webhooks Discord
+dumps SQL privés
+tokens
+mots de passe
 ```
 
 Vérifie que `.gitignore` contient :
@@ -863,7 +1159,7 @@ Historique détaillé des incidents
 Audit log admin
 Rôles admin avancés
 Stats de temps de réponse
-Tests automatisés
+Tests automatisés plus complets
 Page publique par endpoint
 ```
 
