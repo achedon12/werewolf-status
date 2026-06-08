@@ -11,7 +11,8 @@ final class DiscordNotificationService
 {
     public function __construct(
         private DiscordWebhookNotifier $notifier
-    ) {}
+    ) {
+    }
 
     public function notifyDown(Endpoint $endpoint, ?int $httpCode, ?string $reason): bool
     {

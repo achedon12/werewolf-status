@@ -12,8 +12,7 @@ final class PdoEndpointRepository implements EndpointRepository
 {
     public function __construct(
         private PDO $pdo
-    )
-    {
+    ) {
     }
 
     public function findEnabled(): array

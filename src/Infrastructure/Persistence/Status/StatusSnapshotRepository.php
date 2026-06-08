@@ -8,7 +8,8 @@ final class StatusSnapshotRepository
 {
     public function __construct(
         private string $filePath
-    ) {}
+    ) {
+    }
 
     public function get(): ?array
     {

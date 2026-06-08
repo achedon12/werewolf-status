@@ -22,6 +22,4 @@ interface PdoEndpointRepository
     ): void;
 
     public function delete(int $id): void;
-
-
 }

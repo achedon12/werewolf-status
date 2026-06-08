@@ -11,7 +11,8 @@ final class PdoDowntimeRepository implements DowntimeRepository
 {
     public function __construct(
         private PDO $pdo
-    ) {}
+    ) {
+    }
 
     public function startDowntime(
         int $endpointId,

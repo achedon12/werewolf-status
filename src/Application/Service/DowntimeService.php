@@ -12,7 +12,8 @@ final class DowntimeService
     public function __construct(
         private readonly DowntimeRepository $repository,
         private readonly ?DiscordNotificationService $discordNotificationService = null
-    ) {}
+    ) {
+    }
 
     public function handleCheck(
         Endpoint $endpoint,

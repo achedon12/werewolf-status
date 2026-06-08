@@ -13,7 +13,8 @@ final class Downtime
         private ?string $upAt,
         private ?int $httpCode,
         private ?string $reason
-    ) {}
+    ) {
+    }
 
     public function getId(): int
     {

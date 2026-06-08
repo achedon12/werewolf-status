@@ -23,7 +23,8 @@ final class PdoSettingsRepository
 
     public function __construct(
         private PDO $pdo
-    ) {}
+    ) {
+    }
 
     public function get(string $key, ?string $default = null): ?string
     {

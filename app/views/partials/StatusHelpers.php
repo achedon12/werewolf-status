@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Application\Support\UptimeHelper;
+
 const SLOT_COUNT = 24;
-const PERIOD_HOURS = 48;
-const SLOT_DURATION_HOURS = 2;
 
 function e(string|int|float|null $value): string
 {
@@ -29,60 +29,9 @@ function getUptimeUnit(array $service): string
     return (string) ($service['uptime_unit'] ?? 'seconds');
 }
 
-function uptimeToStartedTimestamp(?int $uptime, string $unit = 'seconds'): ?int
+function uptimeToStartedTimestamp(int|string|null $uptime, string $unit = 'seconds'): ?int
 {
-    if ($uptime === null) {
-        return null;
-    }
-
-    $value = (float) $uptime;
-
-    if ($value <= 0) {
-        return null;
-    }
-
-    return match ($unit) {
-        'milliseconds' => time() - (int) floor($value / 1000),
-        'timestamp_seconds' => (int) $value,
-        'timestamp_milliseconds' => (int) floor($value / 1000),
-        default => time() - (int) $value,
-    };
-
-    $text = (string) $uptime;
-    $timestamp = strtotime($text);
-
-    if ($timestamp !== false && $timestamp <= time()) {
-        return $timestamp;
-    }
-
-    if (preg_match('/^(\d+):(\d{2})(?::(\d{2}))?$/', $text, $matches)) {
-        $seconds = ((int) $matches[1] * 3600)
-            + ((int) $matches[2] * 60)
-            + (int) ($matches[3] ?? 0);
-
-        return time() - $seconds;
-    }
-
-    if (preg_match_all('/(\d+)\s*(d|days|h|hours|m|minutes|s|seconds)/i', $text, $parts, PREG_SET_ORDER)) {
-        $seconds = 0;
-
-        foreach ($parts as $part) {
-            $value = (int) $part[1];
-            $unit = strtolower($part[2]);
-
-            $seconds += match (true) {
-                str_starts_with($unit, 'd') => $value * 86400,
-                str_starts_with($unit, 'h') => $value * 3600,
-                str_starts_with($unit, 'm') => $value * 60,
-                str_starts_with($unit, 's') => $value,
-                default => 0,
-            };
-        }
-
-        return $seconds > 0 ? time() - $seconds : null;
-    }
-
-    return null;
+    return UptimeHelper::toStartedTimestamp($uptime, $unit);
 }
 
 function getStartedAt(array $service): ?int
@@ -182,34 +131,9 @@ function formatFrenchDate(int $timestamp): string
     return date('d', $timestamp) . ' ' . $months[(int) date('m', $timestamp)] . ' ' . date('Y H:i', $timestamp);
 }
 
-function formatDuration(int $fromTimestamp): string
+function formatDuration(int $startedAt): string
 {
-    $seconds = max(0, time() - $fromTimestamp);
-
-    $days = intdiv($seconds, 86400);
-    $seconds %= 86400;
-
-    $hours = intdiv($seconds, 3600);
-    $seconds %= 3600;
-
-    $minutes = intdiv($seconds, 60);
-    $seconds %= 60;
-
-    $parts = [];
-
-    if ($days > 0) {
-        $parts[] = $days . 'd';
-    }
-
-    if ($hours > 0 || $days > 0) {
-        $parts[] = $hours . 'h';
-    }
-
-    if ($minutes > 0 || $hours > 0 || $days > 0) {
-        $parts[] = $minutes . 'm';
-    }
-
-    return $parts === [] ? $seconds . 's' : implode(' ', $parts);
+    return UptimeHelper::formatDuration($startedAt);
 }
 
 function renderStatusIcon(string $type): string

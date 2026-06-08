@@ -15,7 +15,8 @@ final class StatusPayloadBuilder
         private PdoSettingsRepository $settingsRepository,
         private StatusChecker $checker,
         private DowntimeService $downtimeService
-    ) {}
+    ) {
+    }
 
     public function build(): array
     {

@@ -15,7 +15,8 @@ final class Endpoint
         private bool $isEnabled,
         private bool $discordNotificationsEnabled,
         private ?string $discordWebhookUrl
-    ) {}
+    ) {
+    }
 
     public function getId(): int
     {

@@ -47,16 +47,28 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "Tests\\": "tests/"
+            "Tests\\": "tests/",
+            "Application\\": "tests/Application/",
+            "Infrastructure\\": "tests/Infrastructure/",
+            "Domain\\": "tests/Domain/",
+            "Support\\": "tests/Support/"
         }
     },
     "scripts": {
         "start": "php -S localhost:8080 -t public",
         "test": "phpunit",
         "phinx": "phinx",
+        "analyse": "phpstan analyse src app",
+        "cs": "phpcs",
+        "cs-fix": "phpcbf",
         "migrate": "phinx migrate",
         "rollback": "phinx rollback",
         "status-db": "phinx status",
         "seed": "phinx seed:run"
+    },
+    "require-dev": {
+        "phpstan/phpstan": "^2.2",
+        "phpunit/phpunit": "^12.5",
+        "squizlabs/php_codesniffer": "^4.0"
     }
 }

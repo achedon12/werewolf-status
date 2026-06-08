@@ -14,10 +14,10 @@ final class CreateAdminUserAction extends Action
 {
     protected function action(): Response
     {
-        $data = (array) $this->request->getParsedBody();
+        $data = (array)$this->request->getParsedBody();
 
-        $username = trim((string) ($data['username'] ?? ''));
-        $password = (string) ($data['password'] ?? '');
+        $username = trim((string)($data['username'] ?? ''));
+        $password = (string)($data['password'] ?? '');
 
         if ($username === '' || $password === '') {
             FlashService::error('Veuillez remplir tous les champs.');
